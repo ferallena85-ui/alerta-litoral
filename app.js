@@ -90,8 +90,19 @@ function makeRiverGroup(wrap,title,subtitle,stations,emptyText,links){
   left.append(el('strong',null,s.station));
   left.append(el('small',null,s.observedAt?`Medición: ${localDate(s.observedAt)}`:s.reportedOn?`Parte publicado: ${localDate(s.reportedOn,{hour:undefined,minute:undefined})}`:'Fecha no confirmada'));
   if(s.archivedReference)left.append(el('small','stale-tag','REFERENCIA HISTÓRICA VERIFICADA · no es una lectura nueva; no se pudo actualizar esta estación'));else if(s.stale)left.append(el('small','stale-tag','Dato anterior a 72 horas · verificar fuente'));
-  if(s.alertThreshold!=null)left.append(el('small',null,`Alerta${s.alertType==='técnica'?' técnica':''} en esta estación: ${fmt(s.alertThreshold)} m`));
-  if(s.evacuationThreshold!=null&&s.evacuationThreshold>0)left.append(el('small',null,`Umbral de evacuación de estación: ${fmt(s.evacuationThreshold)} m`));
+  if(s.alertThreshold!=null){
+    left.append(el('small',null,`${s.alertType==='técnica'?'Umbral técnico INA (aviso / alerta de escala)':'Nivel de alerta'}: ${fmt(s.alertThreshold)} m`));
+    if(s.alertSource)addLink(left,'Fuente del umbral técnico ↗',s.alertSource,'reading-source');
+  }
+  if(s.provincialAlertThreshold!=null){
+    left.append(el('small',null,`Referencia de alerta provincial: ${fmt(s.provincialAlertThreshold)} m (comunicada 04/09/2026)`));
+    if(s.provincialAlertSource)addLink(left,'Fuente: Gobierno de Santa Fe ↗',s.provincialAlertSource,'reading-source');
+  }
+  if(s.evacuationThreshold!=null&&s.evacuationThreshold>0){
+    left.append(el('small',null,`Umbral de evacuación de esta estación: ${fmt(s.evacuationThreshold)} m`));
+  }else if(s.river==='Salado'){
+    left.append(el('small','stale-tag','Cota de evacuación: sin valor oficial publicado para esta escala. Seguí las indicaciones de Protección Civil.'));
+  }
   if(s.source)addLink(left,'Fuente de esta lectura ↗',s.source,'reading-source');
   right.append(el('b',null,`${fmt(s.value)} m`));if(s.trend)right.append(el('span',null,`Tendencia: ${s.trend}`));
   item.append(left,right);section.append(item);
@@ -104,7 +115,7 @@ function renderRivers(stations){
  const parana=(stations||[]).filter(s=>s.river==='Paraná');
  const salado=(stations||[]).filter(s=>s.river==='Salado').sort((a,b)=>(priority[a.station]??10)-(priority[b.station]??10));
  makeRiverGroup(wrap,'Río Paraná','Puerto de Santa Fe · niveles y perspectiva oficial',parana,'Sin lectura verificable del Paraná en esta consulta.',[['INA · Paraná','https://alerta.ina.gob.ar/a5/diario/reporte_diario']]);
- makeRiverGroup(wrap,'Río Salado','Estaciones Recreo y Santo Tomé · seguimiento de la cuenca',salado,'No se pudo recuperar una lectura verificable del Salado en esta consulta. Podés abrir las mediciones oficiales directamente.',[['FICH · toda la cuenca','https://fich.unl.edu.ar/cim/rios/salado/alturas'],['Santo Tomé · historial','https://fich.unl.edu.ar/cim/rios/historico/6'],['Recreo · historial','https://fich.unl.edu.ar/cim/rios/historico/5']]);
+ makeRiverGroup(wrap,'Río Salado','Estaciones Recreo y Santo Tomé · seguimiento de la cuenca',salado,'No se pudo recuperar una lectura verificable del Salado en esta consulta. Podés abrir las mediciones oficiales directamente.',[['INA · mapa de escalas','https://alerta.ina.gob.ar/'],['Gobierno de Santa Fe · niveles de referencia','https://www.santafe.gob.ar/noticias/noticia/287215/']]);
  wrap.append(el('p','river-note','Las escalas de Santo Tomé, Recreo y Santa Fe son distintas. El umbral técnico de una estación no determina por sí solo inundación o evacuación de barrios.'));
 }
 function renderEnso(enso){if(!enso){$('#ensoStatus').textContent='No se pudo verificar el estado actual';$('#ensoText').textContent='Consultá el informe del SMN. No atribuimos una fase del fenómeno sin respaldo oficial reciente.';$('#ensoDate').textContent='';return}$('#ensoStatus').textContent=enso.status||'Consultar informe oficial';$('#ensoText').textContent=enso.summary||'El informe no tiene un resumen disponible en formato accesible.';$('#ensoDate').textContent=enso.publishedAt?`Fecha de referencia: ${enso.publishedAt.slice(0,10)} · fuente: ${new URL(enso.source).hostname}`:'La fuente no informa claramente fecha de publicación.';let a=$('#ensoSource');if(safeLink(enso.source))a.href=enso.source;}
@@ -114,7 +125,7 @@ function renderReport(r){
  const parana=good.filter(s=>s.river==='Paraná');const salado=good.filter(s=>s.river==='Salado');
  const archived=(r.stations||[]).filter(s=>s.river==='Salado'&&s.archivedReference);
  const fmtGroup=(arr,kind)=>arr.length?`${kind}: ${arr.map(s=>`${s.station} ${fmt(s.value)} m${s.trend?' ('+s.trend+')':''}`).join(', ')}.`:kind==='Salado'&&archived.length?`${kind}: sin mediciones nuevas recuperadas; última referencia histórica: ${archived.map(s=>`${s.station} ${fmt(s.value)} m (28/10/2026)`).join(', ')}. No equivale a un registro actual.`:`${kind}: sin medición reciente verificable; consultar la fuente.`;
- $('#reportSummary').textContent=[fmtGroup(parana,'Paraná'),fmtGroup(salado,'Salado')].join(' ')+' Cada estación conserva su propia fecha de medición.';
+ $('#reportSummary').textContent=[fmtGroup(parana,'Paraná'),fmtGroup(salado,'Salado')].join(' ')+' Cada estación conserva su propia fecha de medición. Para Recreo y Santo Tomé: umbral técnico INA 4,70 m; referencia de alerta provincial informada el 04/09/2026: 5,70 m. No se dispone de una cota de evacuación oficial publicada para estas escalas.';
  const hints=$('#highlights');hints.replaceChildren();for(const n of r.noteworthy||[])hints.append(el('div','notice',n.title));
  const forecast=$('#forecastWrap');if(r.forecast?.text){forecast.hidden=false;$('#forecastText').textContent=r.forecast.text;const link=$('#forecastLink');if(safeLink(r.forecast.source))link.href=r.forecast.source}else forecast.hidden=true;
  const sources=$('#sources');sources.replaceChildren();for(const source of r.sources||[]){const li=el('li');addLink(li,source.name+' ↗',source.url,'ordinary-link');sources.append(li)}
