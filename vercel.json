@@ -1,9 +1,34 @@
 {
   "version": 2,
-  "functions": {"api/reporte.js": {"maxDuration": 30}},
   "headers": [
-    {"source": "/manifest.webmanifest", "headers": [{"key": "Content-Type", "value": "application/manifest+json"}]},
-    {"source": "/sw.js", "headers": [{"key": "Cache-Control", "value": "no-cache"}]},
-    {"source": "/api/reporte", "headers": [{"key": "Access-Control-Allow-Origin", "value": "*"}]}
-  ]
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/api/reporte",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ],
+  "framework": null,
+  "$schema": "https://openapi.vercel.sh/vercel.json"
 }
