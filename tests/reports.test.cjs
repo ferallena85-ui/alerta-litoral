@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test');const assert=require('node:assert/strict');
-const {SOURCES,num,parseMap,parseFichSalado,latestRecord,parseDaily,parseEnso,parseObservations,parseBulletin,parseFeed,collect}=require('../lib/reports.cjs');
+const {SOURCES,num,parseMap,parseFichSalado,parseFichHistory,parseSantoTomeNews,latestRecord,parseDaily,parseEnso,parseObservations,parseBulletin,parseFeed,collect}=require('../lib/reports.cjs');
 test('Lecturas en metros con coma y punto; no acepta números de miles ni inverosímiles',()=>{
  assert.equal(num('4,23'),4.23);assert.equal(num('2.22'),2.22);assert.equal(num('17700'),null);assert.equal(num('-3'),null);assert.equal(num(''),null)
 });
@@ -49,4 +49,27 @@ test('Prioriza fuente con fecha de publicación/lectura más nueva',()=>{
  const newer={station:'Recreo · Ruta 70',value:2.15,reportedOn:'2026-10-28'};
  assert.equal(latestRecord(old,newer).value,2.15);
  assert.equal(latestRecord(newer,old).value,2.15);
+});
+
+const inaSaladoRows=`<table><tr><td>1679</td><td>2026-10-28T15:52:00Z</td><td>4.33</td><td>4.3</td><td>crece</td><td>normal</td><td>n</td><td>crece:n</td><td>Santo Tomé</td><td>alturas_bdhi</td><td></td><td>3044</td><td>2</td><td>4.7</td><td>0</td><td>0</td><td>2026-10-22T14:23:00.000Z</td><td>2026-10-28T15:52:00.000Z</td><td>SALADOSANTAFE</td><td></td></tr></table>`;
+test('INA mapa extrae Santo Tomé y su umbral técnico',()=>{
+ const x=parseMap(inaSaladoRows);assert.equal(x.length,1);assert.equal(x[0].station,'Santo Tomé');assert.equal(x[0].value,4.33);assert.equal(x[0].river,'Salado');assert.equal(x[0].alertThreshold,4.7);
+});
+const hist=`<h2>Estación: Santo Tomé</h2><p>Nivel de alerta: 4,70 m</p><table><tr><td>28/10/2026</td><td>12:52</td><td>4,33</td><td>0,03</td><td><img alt="Crece"></td><td>4,30</td></tr><tr><td>27/10/2026</td><td>10:40</td><td>4,30</td><td>0,05</td><td>Crece</td><td>4,25</td></tr></table>`;
+test('Historial FICH permite recuperar última lectura de Santo Tomé con fecha y hora',()=>{
+ const r=parseFichHistory(hist,'Santo Tomé',SOURCES.fichSantoTome);
+ assert.equal(r.value,4.33);assert.equal(r.observedAt,'2026-10-28T15:52:00.000Z');assert.equal(r.alertThreshold,4.7);
+});
+test('Agregación usa mapa INA si FICH no responde',async()=>{
+ const r=await collect({now:new Date('2026-10-29T12:00:00Z'),fetcher:async url=>url===SOURCES.inaMap?inaSaladoRows:''});
+ assert.equal(r.stations.length,1);assert.equal(r.stations[0].station,'Santo Tomé');
+});
+test('Agregación usa historial de Santo Tomé aun si falla mapa y parte FICH',async()=>{
+ const r=await collect({now:new Date('2026-10-29T12:00:00Z'),fetcher:async url=>url===SOURCES.fichSantoTome?hist:''});
+ assert.equal(r.stations.length,1);assert.equal(r.stations[0].station,'Santo Tomé');
+});
+
+test('Municipalidad Santo Tomé SF: solo enlaza noticias oficiales relevantes',()=>{
+ const html='<a href="/Otros/noticias_ciudad/5746-el_intendente_weiss_ackerley_declara_la_emergencia_hidrica">El Intendente declara la Emergencia Hídrica</a><a href="https://municipiosantotome.gob.ar/crecida-del-rio-uruguay/">Crecida del río Uruguay</a>';
+ const news=parseSantoTomeNews(html);assert.equal(news.length,1);assert.equal(news[0].publishedAt,null);assert.match(news[0].url,/www\.santotome\.gob\.ar/);
 });
