@@ -8,7 +8,7 @@ function addLink(container,label,url,className='source-link'){const href=safeLin
 function openCard(button){const open=button.getAttribute('aria-expanded')==='true';button.setAttribute('aria-expanded',String(!open));const panel=document.getElementById(button.getAttribute('aria-controls'));if(panel)panel.hidden=open}
 document.querySelectorAll('.card-toggle').forEach(button=>button.addEventListener('click',()=>openCard(button)));
 document.querySelectorAll('[data-scroll]').forEach(button=>button.addEventListener('click',()=>{const target=document.getElementById(button.dataset.scroll);target?.scrollIntoView({behavior:'smooth',block:'start'});const b=target?.querySelector('.card-toggle');if(b?.getAttribute('aria-expanded')==='false')openCard(b)}));
-// InstalaciÃ³n PWA Android: el navegador requiere confirmaciÃ³n expresa del usuario.
+// Instalación PWA Android: el navegador requiere confirmación expresa del usuario.
 const installButton = $('#installBtn');
 const installDetails = $('#installInfo');
 const installTab = document.querySelector('.bottom-nav a[href="#instalar"]');
@@ -35,18 +35,18 @@ function displayInstallHelp(message) {
 window.addEventListener('beforeinstallprompt', event => {
   event.preventDefault();
   pendingInstallPrompt = event;
-  if (androidDevice && !alreadyInstalled()) installButton.textContent = 'Instalar aplicaciÃ³n';
+  if (androidDevice && !alreadyInstalled()) installButton.textContent = 'Instalar aplicación';
 });
 window.addEventListener('appinstalled', () => {
   pendingInstallPrompt = null;
-  installButton.textContent = 'AplicaciÃ³n instalada';
-  // No hay notificaciones: solo se confirma que la PWA se instalÃ³.
-  displayInstallHelp('Alerta Litoral ya estÃ¡ instalada en tu dispositivo. BuscÃ¡ el Ã­cono entre tus aplicaciones.');
+  installButton.textContent = 'Aplicación instalada';
+  // No hay notificaciones: solo se confirma que la PWA se instaló.
+  displayInstallHelp('Alerta Litoral ya está instalada en tu dispositivo. Buscá el ícono entre tus aplicaciones.');
 });
 
 async function requestAppInstall() {
   if (alreadyInstalled()) {
-    displayInstallHelp('Ya estÃ¡s usando Alerta Litoral como aplicaciÃ³n instalada.');
+    displayInstallHelp('Ya estás usando Alerta Litoral como aplicación instalada.');
     return;
   }
   if (androidDevice && pendingInstallPrompt) {
@@ -57,19 +57,19 @@ async function requestAppInstall() {
       await event.prompt();
       const choice = await event.userChoice;
       if (choice?.outcome === 'dismissed') {
-        displayInstallHelp('Si cambiÃ¡s de opiniÃ³n, podÃ©s usar el menÃº â® de Chrome y tocar Â«Instalar aplicaciÃ³nÂ».');
+        displayInstallHelp('Si cambiás de opinión, podés usar el menú ⋮ de Chrome y tocar «Instalar aplicación».');
       }
     } catch (err) {
-      displayInstallHelp('AbrÃ­ Alerta Litoral en Google Chrome, tocÃ¡ el menÃº â® y elegÃ­ Â«Instalar aplicaciÃ³nÂ» o Â«Agregar a pantalla principalÂ».');
+      displayInstallHelp('Abrí Alerta Litoral en Google Chrome, tocá el menú ⋮ y elegí «Instalar aplicación» o «Agregar a pantalla principal».');
     }
     return;
   }
   if (androidDevice) {
-    displayInstallHelp('AbrÃ­ este enlace directamente en Google Chrome (no dentro de WhatsApp). TocÃ¡ el menÃº â® y elegÃ­ Â«Instalar aplicaciÃ³nÂ» o Â«Agregar a pantalla principalÂ». Si el navegador todavÃ­a no ofrece instalaciÃ³n directa, podÃ©s crear el acceso desde ese menÃº.');
+    displayInstallHelp('Abrí este enlace directamente en Google Chrome (no dentro de WhatsApp). Tocá el menú ⋮ y elegí «Instalar aplicación» o «Agregar a pantalla principal». Si el navegador todavía no ofrece instalación directa, podés crear el acceso desde ese menú.');
   } else if (iosDevice) {
-    displayInstallHelp('En iPhone, abrÃ­ el enlace en Safari, tocÃ¡ Compartir y elegÃ­ Â«Agregar a pantalla de inicioÂ».');
+    displayInstallHelp('En iPhone, abrí el enlace en Safari, tocá Compartir y elegí «Agregar a pantalla de inicio».');
   } else {
-    displayInstallHelp('AbrÃ­ el menÃº de tu navegador y buscÃ¡ Â«Instalar aplicaciÃ³nÂ» o Â«Crear acceso directoÂ».');
+    displayInstallHelp('Abrí el menú de tu navegador y buscá «Instalar aplicación» o «Crear acceso directo».');
   }
 }
 installButton.addEventListener('click', requestAppInstall);
@@ -77,9 +77,9 @@ if (installTab) installTab.addEventListener('click', event => {
   event.preventDefault();
   requestAppInstall();
 });
-installButton.textContent = alreadyInstalled() ? 'AplicaciÃ³n instalada' : androidDevice ? 'Instalar aplicaciÃ³n' : 'CÃ³mo instalar';
+installButton.textContent = alreadyInstalled() ? 'Aplicación instalada' : androidDevice ? 'Instalar aplicación' : 'Cómo instalar';
 
-$('#shareBtn').addEventListener('click',async()=>{const data={title:'Alerta Litoral',text:'Informes del NiÃ±o Â· ParanÃ¡ y Salado en Santa Fe',url:location.origin};if(navigator.share){try{await navigator.share(data)}catch{}}else{try{await navigator.clipboard.writeText(data.url);$('#shareBtn').title='Enlace copiado'}catch{window.prompt('CopiÃ¡ el enlace:',data.url)}}});
+$('#shareBtn').addEventListener('click',async()=>{const data={title:'Alerta Litoral',text:'Informes del Niño · Paraná y Salado en Santa Fe',url:location.origin};if(navigator.share){try{await navigator.share(data)}catch{}}else{try{await navigator.clipboard.writeText(data.url);$('#shareBtn').title='Enlace copiado'}catch{window.prompt('Copiá el enlace:',data.url)}}});
 const reportDate=report=>{const x=report.reportDate;if(!x)return null;const d=new Date(x+'T12:00:00-03:00');return localDate(d,{hour:undefined,minute:undefined})};
 function makeRiverGroup(wrap,title,subtitle,stations,emptyText,links){
  const section=el('section','river-group');section.append(el('h3','river-group-title',title));
@@ -88,29 +88,22 @@ function makeRiverGroup(wrap,title,subtitle,stations,emptyText,links){
  for(const s of stations){
   const item=el('article','river-item'),left=el('div'),right=el('div','reading');
   left.append(el('strong',null,s.station));
-  left.append(el('small',null,s.observedAt?`MediciÃ³n: ${localDate(s.observedAt)}`:s.reportedOn?`Parte publicado: ${localDate(s.reportedOn,{hour:undefined,minute:undefined})}`:'Fecha no confirmada'));
-  if(s.archivedReference)left.append(el('small','stale-tag','REFERENCIA HISTÃRICA VERIFICADA Â· no es una lectura nueva; no se pudo actualizar esta estaciÃ³n'));else if(s.stale)left.append(el('small','stale-tag','Dato anterior a 72 horas Â· verificar fuente'));
+  left.append(el('small',null,s.observedAt?`Medición: ${localDate(s.observedAt)}`:s.reportedOn?`Parte publicado: ${localDate(s.reportedOn,{hour:undefined,minute:undefined})}`:'Fecha no confirmada'));
+  if(s.archivedReference)left.append(el('small','stale-tag','REFERENCIA HISTÓRICA VERIFICADA · no es una lectura nueva; no se pudo actualizar esta estación'));else if(s.stale)left.append(el('small','stale-tag','Dato anterior a 72 horas · verificar fuente'));
   if(s.alertThreshold!=null){
-    left.append(el('small',null,`${s.alertType==='tÃ©cnica'?'Umbral tÃ©cnico INA (aviso / alerta de escala)':'Nivel de alerta'}: ${fmt(s.alertThreshold)} m`));
-    if(s.alertSource)addLink(left,'Fuente del umbral tÃ©cnico â',s.alertSource,'reading-source');
+    left.append(el('small',null,`${s.alertType==='técnica'?'Umbral técnico INA (aviso / alerta de escala)':'Nivel de alerta'}: ${fmt(s.alertThreshold)} m`));
+    if(s.alertSource)addLink(left,'Fuente del umbral técnico ↗',s.alertSource,'reading-source');
   }
   if(s.provincialAlertThreshold!=null){
     left.append(el('small',null,`Referencia de alerta provincial: ${fmt(s.provincialAlertThreshold)} m (comunicada 04/09/2026)`));
-    if(s.provincialAlertSource)addLink(left,'Fuente: Gobierno de Santa Fe â',s.provincialAlertSource,'reading-source');
+    if(s.provincialAlertSource)addLink(left,'Fuente: Gobierno de Santa Fe ↗',s.provincialAlertSource,'reading-source');
   }
   if(s.evacuationThreshold!=null&&s.evacuationThreshold>0){
-    left.append(el('small',null,`Umbral de evacuaciÃ³n de esta estaciÃ³n: ${fmt(s.evacuationThreshold)} m`));
+    left.append(el('small',null,`Umbral de evacuación de esta estación: ${fmt(s.evacuationThreshold)} m`));
   }else if(s.river==='Salado'){
-    left.append(el('small','stale-tag','Cota de evacuaciÃ³n: sin valor oficial publicado para esta escala. SeguÃ­ las indicaciones de ProtecciÃ³n Civil.'));
+    left.append(el('small','stale-tag','Cota de evacuación: sin valor oficial publicado para esta escala. Seguí las indicaciones de Protección Civil.'));
   }
-  // Para Santa Fe (Puerto), abrir el visualizador pÃºblico del INA y no
-  // el endpoint JSON sin fechas, que responde "Faltan parÃ¡metros".
-  if(s.source){
-    const lecturaUrl=s.river==='ParanÃ¡'&&s.station==='Santa Fe (Puerto)'
-      ? 'https://alerta.ina.gob.ar/a5/secciones?seriesId=30'
-      : s.source;
-    addLink(left,'Fuente de esta lectura â',lecturaUrl,'reading-source');
-  }
+  if(s.source)addLink(left,'Fuente de esta lectura ↗',s.source,'reading-source');
   right.append(el('b',null,`${fmt(s.value)} m`));if(s.trend)right.append(el('span',null,`Tendencia: ${s.trend}`));
   item.append(left,right);section.append(item);
  }
@@ -118,26 +111,26 @@ function makeRiverGroup(wrap,title,subtitle,stations,emptyText,links){
 }
 function renderRivers(stations){
  const wrap=$('#rivers');wrap.replaceChildren();
- const priority={'Recreo Â· Ruta 70':0,'Santo TomÃ©':1,'Emilia Â· Ruta 62':2,'San Justo Â· Ruta 2':3,'Tostado':4};
- const parana=(stations||[]).filter(s=>s.river==='ParanÃ¡');
+ const priority={'Recreo · Ruta 70':0,'Santo Tomé':1,'Emilia · Ruta 62':2,'San Justo · Ruta 2':3,'Tostado':4};
+ const parana=(stations||[]).filter(s=>s.river==='Paraná');
  const salado=(stations||[]).filter(s=>s.river==='Salado').sort((a,b)=>(priority[a.station]??10)-(priority[b.station]??10));
- makeRiverGroup(wrap,'RÃ­o ParanÃ¡','Puerto de Santa Fe Â· niveles y perspectiva oficial',parana,'Sin lectura verificable del ParanÃ¡ en esta consulta.',[['INA Â· ParanÃ¡','https://alerta.ina.gob.ar/a5/diario/reporte_diario']]);
- makeRiverGroup(wrap,'RÃ­o Salado','Estaciones Recreo y Santo TomÃ© Â· seguimiento de la cuenca',salado,'No se pudo recuperar una lectura verificable del Salado en esta consulta. PodÃ©s abrir las mediciones oficiales directamente.',[['INA Â· mapa de escalas','https://alerta.ina.gob.ar/'],['Gobierno de Santa Fe Â· niveles de referencia','https://www.santafe.gob.ar/noticias/noticia/287215/']]);
- wrap.append(el('p','river-note','Las escalas de Santo TomÃ©, Recreo y Santa Fe son distintas. El umbral tÃ©cnico de una estaciÃ³n no determina por sÃ­ solo inundaciÃ³n o evacuaciÃ³n de barrios.'));
+ makeRiverGroup(wrap,'Río Paraná','Puerto de Santa Fe · niveles y perspectiva oficial',parana,'Sin lectura verificable del Paraná en esta consulta.',[['INA · Paraná','https://alerta.ina.gob.ar/a5/diario/reporte_diario']]);
+ makeRiverGroup(wrap,'Río Salado','Estaciones Recreo y Santo Tomé · seguimiento de la cuenca',salado,'No se pudo recuperar una lectura verificable del Salado en esta consulta. Podés abrir las mediciones oficiales directamente.',[['INA · mapa de escalas','https://alerta.ina.gob.ar/'],['Gobierno de Santa Fe · niveles de referencia','https://www.santafe.gob.ar/noticias/noticia/287215/']]);
+ wrap.append(el('p','river-note','Las escalas de Santo Tomé, Recreo y Santa Fe son distintas. El umbral técnico de una estación no determina por sí solo inundación o evacuación de barrios.'));
 }
-function renderEnso(enso){if(!enso){$('#ensoStatus').textContent='No se pudo verificar el estado actual';$('#ensoText').textContent='ConsultÃ¡ el informe del SMN. No atribuimos una fase del fenÃ³meno sin respaldo oficial reciente.';$('#ensoDate').textContent='';return}$('#ensoStatus').textContent=enso.status||'Consultar informe oficial';$('#ensoText').textContent=enso.summary||'El informe no tiene un resumen disponible en formato accesible.';$('#ensoDate').textContent=enso.publishedAt?`Fecha de referencia: ${enso.publishedAt.slice(0,10)} Â· fuente: ${new URL(enso.source).hostname}`:'La fuente no informa claramente fecha de publicaciÃ³n.';let a=$('#ensoSource');if(safeLink(enso.source))a.href=enso.source;}
-function renderNews(news){const box=$('#news');box.replaceChildren();if(!news?.length){box.append(el('p','section-note','No se detectaron nuevas publicaciones hÃ­dricas en el canal oficial consultado en los Ãºltimos 30 dÃ­as, o no estuvo disponible. Esto no descarta novedades en otras fuentes.'));return}news.forEach(n=>{const row=el('article','news-item');addLink(row,n.title+' â',n.url,'news-link');if(n.summary)row.append(el('p',null,n.summary));if(n.publishedAt)row.append(el('time',null,localDate(n.publishedAt)));else if(n.sourceName?.includes('Santo TomÃ©'))row.append(el('time',null,'Fecha: consultar publicaciÃ³n municipal'));box.append(row)})}
+function renderEnso(enso){if(!enso){$('#ensoStatus').textContent='No se pudo verificar el estado actual';$('#ensoText').textContent='Consultá el informe del SMN. No atribuimos una fase del fenómeno sin respaldo oficial reciente.';$('#ensoDate').textContent='';return}$('#ensoStatus').textContent=enso.status||'Consultar informe oficial';$('#ensoText').textContent=enso.summary||'El informe no tiene un resumen disponible en formato accesible.';$('#ensoDate').textContent=enso.publishedAt?`Fecha de referencia: ${enso.publishedAt.slice(0,10)} · fuente: ${new URL(enso.source).hostname}`:'La fuente no informa claramente fecha de publicación.';let a=$('#ensoSource');if(safeLink(enso.source))a.href=enso.source;}
+function renderNews(news){const box=$('#news');box.replaceChildren();if(!news?.length){box.append(el('p','section-note','No se detectaron nuevas publicaciones hídricas en el canal oficial consultado en los últimos 30 días, o no estuvo disponible. Esto no descarta novedades en otras fuentes.'));return}news.forEach(n=>{const row=el('article','news-item');addLink(row,n.title+' ↗',n.url,'news-link');if(n.summary)row.append(el('p',null,n.summary));if(n.publishedAt)row.append(el('time',null,localDate(n.publishedAt)));else if(n.sourceName?.includes('Santo Tomé'))row.append(el('time',null,'Fecha: consultar publicación municipal'));box.append(row)})}
 function renderReport(r){
  const good=(r.stations||[]).filter(s=>!s.stale);
- const parana=good.filter(s=>s.river==='ParanÃ¡');const salado=good.filter(s=>s.river==='Salado');
+ const parana=good.filter(s=>s.river==='Paraná');const salado=good.filter(s=>s.river==='Salado');
  const archived=(r.stations||[]).filter(s=>s.river==='Salado'&&s.archivedReference);
- const fmtGroup=(arr,kind)=>arr.length?`${kind}: ${arr.map(s=>`${s.station} ${fmt(s.value)} m${s.trend?' ('+s.trend+')':''}`).join(', ')}.`:kind==='Salado'&&archived.length?`${kind}: sin mediciones nuevas recuperadas; Ãºltima referencia histÃ³rica: ${archived.map(s=>`${s.station} ${fmt(s.value)} m (28/10/2026)`).join(', ')}. No equivale a un registro actual.`:`${kind}: sin mediciÃ³n reciente verificable; consultar la fuente.`;
- $('#reportSummary').textContent=[fmtGroup(parana,'ParanÃ¡'),fmtGroup(salado,'Salado')].join(' ')+' Cada estaciÃ³n conserva su propia fecha de mediciÃ³n. Para Recreo y Santo TomÃ©: umbral tÃ©cnico INA 4,70 m; referencia de alerta provincial informada el 04/09/2026: 5,70 m. No se dispone de una cota de evacuaciÃ³n oficial publicada para estas escalas.';
+ const fmtGroup=(arr,kind)=>arr.length?`${kind}: ${arr.map(s=>`${s.station} ${fmt(s.value)} m${s.trend?' ('+s.trend+')':''}`).join(', ')}.`:kind==='Salado'&&archived.length?`${kind}: sin mediciones nuevas recuperadas; última referencia histórica: ${archived.map(s=>`${s.station} ${fmt(s.value)} m (28/10/2026)`).join(', ')}. No equivale a un registro actual.`:`${kind}: sin medición reciente verificable; consultar la fuente.`;
+ $('#reportSummary').textContent=[fmtGroup(parana,'Paraná'),fmtGroup(salado,'Salado')].join(' ')+' Cada estación conserva su propia fecha de medición. Para Recreo y Santo Tomé: umbral técnico INA 4,70 m; referencia de alerta provincial informada el 04/09/2026: 5,70 m. No se dispone de una cota de evacuación oficial publicada para estas escalas.';
  const hints=$('#highlights');hints.replaceChildren();for(const n of r.noteworthy||[])hints.append(el('div','notice',n.title));
  const forecast=$('#forecastWrap');if(r.forecast?.text){forecast.hidden=false;$('#forecastText').textContent=r.forecast.text;const link=$('#forecastLink');if(safeLink(r.forecast.source))link.href=r.forecast.source}else forecast.hidden=true;
- const sources=$('#sources');sources.replaceChildren();for(const source of r.sources||[]){const li=el('li');addLink(li,source.name+' â',source.url,'ordinary-link');sources.append(li)}
+ const sources=$('#sources');sources.replaceChildren();for(const source of r.sources||[]){const li=el('li');addLink(li,source.name+' ↗',source.url,'ordinary-link');sources.append(li)}
 }
-function render(data){const checked=$('#checkedAt'),badge=$('#statusBadge');checked.textContent=localDate(data.checkedAt);const success=data.status!=='unavailable';const bad=[data.fetched?.inaDaily,data.fetched?.inaMap,data.fetched?.smnEnso,data.fetched?.municipality].filter(Boolean).length;badge.className='status-pill '+(!success?'unavailable':bad<4?'warning':'available');badge.textContent=!success?'Sin datos nuevos':data.archivedSaladoShown?'Parcial Â· Salado histÃ³rico':bad<4?'Parcial':'Consultado';renderRivers(data.stations||[]);renderEnso(data.enso);renderNews(data.news);renderReport(data);}
+function render(data){const checked=$('#checkedAt'),badge=$('#statusBadge');checked.textContent=localDate(data.checkedAt);const success=data.status!=='unavailable';const bad=[data.fetched?.inaDaily,data.fetched?.inaMap,data.fetched?.smnEnso,data.fetched?.municipality].filter(Boolean).length;badge.className='status-pill '+(!success?'unavailable':bad<4?'warning':'available');badge.textContent=!success?'Sin datos nuevos':data.archivedSaladoShown?'Parcial · Salado histórico':bad<4?'Parcial':'Consultado';renderRivers(data.stations||[]);renderEnso(data.enso);renderNews(data.news);renderReport(data);}
 let requesting=false;
-async function loadReport(){if(requesting)return;requesting=true;$('#refreshBtn').disabled=true;$('#statusBadge').textContent='Consultandoâ¦';try{const res=await fetch('/api/reporte?version=salado-santotome-v2',{headers:{Accept:'application/json'}});if(!res.ok)throw Error('Falla en fuente');const result=await res.json();if(result?.version!==1)throw Error('Respuesta inesperada');render(result);$('#reloadError').classList.add('hidden')}catch(e){$('#reloadError').classList.remove('hidden');$('#checkedAt').textContent='No disponible';$('#statusBadge').className='status-pill unavailable';$('#statusBadge').textContent='Sin conexiÃ³n';$('#reportSummary').textContent='No fue posible obtener el reporte. El sitio no mostrarÃ¡ cifras simuladas. ConsultÃ¡ las fuentes oficiales.';renderRivers([]);renderEnso(null);renderNews([])}finally{$('#refreshBtn').disabled=false;requesting=false}}
+async function loadReport(){if(requesting)return;requesting=true;$('#refreshBtn').disabled=true;$('#statusBadge').textContent='Consultando…';try{const res=await fetch('/api/reporte?version=salado-santotome-v2',{headers:{Accept:'application/json'}});if(!res.ok)throw Error('Falla en fuente');const result=await res.json();if(result?.version!==1)throw Error('Respuesta inesperada');render(result);$('#reloadError').classList.add('hidden')}catch(e){$('#reloadError').classList.remove('hidden');$('#checkedAt').textContent='No disponible';$('#statusBadge').className='status-pill unavailable';$('#statusBadge').textContent='Sin conexión';$('#reportSummary').textContent='No fue posible obtener el reporte. El sitio no mostrará cifras simuladas. Consultá las fuentes oficiales.';renderRivers([]);renderEnso(null);renderNews([])}finally{$('#refreshBtn').disabled=false;requesting=false}}
 $('#refreshBtn').addEventListener('click',loadReport);$('#retryBtn').addEventListener('click',loadReport);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-lastCheck>1800000){lastCheck=Date.now();loadReport()}});let lastCheck=Date.now();loadReport();if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
