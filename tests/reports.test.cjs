@@ -20,7 +20,7 @@ test('Boletín más nuevo con su fecha, fuente y PDF',()=>{
  const b=parseBulletin(html);assert.equal(b.publishedAt.slice(0,10),'2026-10-22');assert.match(b.url,/boletin8\.pdf/);
 });
 test('Agregación no inventa mediciones ante caídas de fuente',async()=>{
- const d=await collect({fetcher:async()=>{throw Error('offline')},now:new Date('2026-10-28T21:00:00Z')});assert.equal(d.status,'unavailable');assert.equal(d.stations.length,0);assert.equal(d.noteworthy.length,0);
+ const d=await collect({fetcher:async()=>{throw Error('offline')},now:new Date('2026-10-28T21:00:00Z')});assert.equal(d.stations.length,2);assert.equal(d.archivedSaladoShown,true);assert.equal(d.stations.every(s=>s.archivedReference&&s.stale),true);assert.equal(d.noteworthy.length,0);
 });
 test('Agregación con reporte real simulado mantiene fuente y fechas',async()=>{
  const d=await collect({fetcher:async(u)=>u===SOURCES.inaDaily?htmlDaily:'',now:new Date('2026-10-28T21:00:00Z')});assert.equal(d.stations[0].value,4.23);assert.equal(d.stations[0].stale,false);assert.equal(d.stations[0].source,SOURCES.inaDaily)
@@ -62,14 +62,49 @@ test('Historial FICH permite recuperar última lectura de Santo Tomé con fecha 
 });
 test('Agregación usa mapa INA si FICH no responde',async()=>{
  const r=await collect({now:new Date('2026-10-29T12:00:00Z'),fetcher:async url=>url===SOURCES.inaMap?inaSaladoRows:''});
- assert.equal(r.stations.length,1);assert.equal(r.stations[0].station,'Santo Tomé');
+ assert.equal(r.stations.filter(s=>!s.archivedReference).length,1);assert.equal(r.stations.find(s=>!s.archivedReference).station,'Santo Tomé');
 });
 test('Agregación usa historial de Santo Tomé aun si falla mapa y parte FICH',async()=>{
  const r=await collect({now:new Date('2026-10-29T12:00:00Z'),fetcher:async url=>url===SOURCES.fichSantoTome?hist:''});
- assert.equal(r.stations.length,1);assert.equal(r.stations[0].station,'Santo Tomé');
+ assert.equal(r.stations.filter(s=>!s.archivedReference).length,1);assert.equal(r.stations.find(s=>!s.archivedReference).station,'Santo Tomé');
 });
 
 test('Municipalidad Santo Tomé SF: solo enlaza noticias oficiales relevantes',()=>{
  const html='<a href="/Otros/noticias_ciudad/5746-el_intendente_weiss_ackerley_declara_la_emergencia_hidrica">El Intendente declara la Emergencia Hídrica</a><a href="https://municipiosantotome.gob.ar/crecida-del-rio-uruguay/">Crecida del río Uruguay</a>';
  const news=parseSantoTomeNews(html);assert.equal(news.length,1);assert.equal(news[0].publishedAt,null);assert.match(news[0].url,/www\.santotome\.gob\.ar/);
+});
+
+test('La lectura del Paraná del 29 tiene prioridad sobre un parte INA del 28', async()=>{
+ const mapRow=['30','2026-10-29T11:00:00Z','4.38','4.23','crece','normal','n','crece:n','Santa Fe','alturas_bdhi','','30','2','5.3','5.7','0','2026-10-22T14:00:00Z','2026-10-29T11:00:00Z','PARANAINF',''];
+ const map='<table><tr>'+mapRow.map(v=>'<td>'+v+'</td>').join('')+'</tr></table>';
+ const r=await collect({fetcher:async url=>url===SOURCES.inaDaily?htmlDaily:url===SOURCES.inaMap?map:'',now:new Date('2026-10-29T15:00:00Z')});
+ const parana=r.stations.find(x=>x.river==='Paraná');
+ assert.equal(parana.value,4.38); assert.equal(parana.observedAt,'2026-10-29T11:00:00.000Z');
+});
+test('Diagnóstico visible y sin inventar datos cuando falla una fuente',async()=>{
+ const r=await collect({fetcher:async url=>url===SOURCES.inaDaily?htmlDaily:'',now:new Date('2026-10-29T15:00:00Z')});
+ assert.equal(r.saladoStationsFound,0);assert.equal(r.archivedSaladoShown,true);
+ assert.equal(r.sourceChecks.find(s=>s.name==='FICH cuenca Salado').ok,false);
+ assert.equal(r.sourceChecks.find(s=>s.name==='INA diario').ok,true);
+});
+
+test('API directa INA serie 3044 permite Santo Tomé en el Salado',async()=>{
+ const payload=JSON.stringify({observaciones:[{valor:4.30,timestart:'2026-10-27T15:52:00Z'},{valor:4.33,timestart:'2026-10-28T15:52:00Z'}]});
+ const r=await collect({now:new Date('2026-10-29T12:00:00Z'),fetcher:async url=>url.startsWith(SOURCES.inaSanto)?payload:''});
+ const x=r.stations.find(s=>s.station==='Santo Tomé');
+ assert.equal(x.value,4.33); assert.equal(x.trend,'crece'); assert.equal(x.river,'Salado');
+});
+
+
+test('Si una estación se recupera de origen, no sustituirla por el archivo estático',async()=>{
+ const html='<table><tr><td>28/10/2026</td><td>12:52</td><td>4,33</td><td>0,03</td><td>Crece</td><td>4,30</td></tr></table>';
+ const r=await collect({now:new Date('2026-10-29T12:00:00Z'),fetcher:async url=>url===SOURCES.fichSantoTome?html:''});
+ const s=r.stations.find(x=>x.station==='Santo Tomé');
+ assert.equal(s.value,4.33); assert.equal(s.archivedReference,undefined);assert.equal(r.saladoStationsFound,1);
+});
+test('El archivo histórico no se presenta como dato actual aunque se consulte hoy',async()=>{
+ const r=await collect({now:new Date('2026-11-15T12:00:00Z'),fetcher:async()=>{throw Error('no hay acceso')} });
+ assert.equal(r.stations.filter(x=>x.archivedReference).length,2);
+ assert.equal(r.stations.every(x=>x.stale),true);
+ assert.ok(r.stations.every(x=>x.observedAt.startsWith('2026-10-28')));
 });
