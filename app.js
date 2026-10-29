@@ -8,7 +8,77 @@ function addLink(container,label,url,className='source-link'){const href=safeLin
 function openCard(button){const open=button.getAttribute('aria-expanded')==='true';button.setAttribute('aria-expanded',String(!open));const panel=document.getElementById(button.getAttribute('aria-controls'));if(panel)panel.hidden=open}
 document.querySelectorAll('.card-toggle').forEach(button=>button.addEventListener('click',()=>openCard(button)));
 document.querySelectorAll('[data-scroll]').forEach(button=>button.addEventListener('click',()=>{const target=document.getElementById(button.dataset.scroll);target?.scrollIntoView({behavior:'smooth',block:'start'});const b=target?.querySelector('.card-toggle');if(b?.getAttribute('aria-expanded')==='false')openCard(b)}));
-$('#installBtn').addEventListener('click',()=>{const box=$('#installInfo');box.hidden=!box.hidden;box.scrollIntoView({behavior:'smooth',block:'nearest'})});
+// Instalación PWA Android: el navegador requiere confirmación expresa del usuario.
+const installButton = $('#installBtn');
+const installDetails = $('#installInfo');
+const installTab = document.querySelector('.bottom-nav a[href="#instalar"]');
+const installUA = navigator.userAgent || '';
+const androidDevice = /Android/i.test(installUA);
+const iosDevice = /iPhone|iPad|iPod/i.test(installUA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const alreadyInstalled = () =>
+  (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches) ||
+  navigator.standalone === true;
+let pendingInstallPrompt = null;
+
+function displayInstallHelp(message) {
+  installDetails.hidden = false;
+  let info = document.getElementById('installHint');
+  if (!info) {
+    info = document.createElement('p');
+    info.id = 'installHint';
+    installDetails.prepend(info);
+  }
+  info.textContent = message;
+  document.getElementById('instalar').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  pendingInstallPrompt = event;
+  if (androidDevice && !alreadyInstalled()) installButton.textContent = 'Instalar aplicación';
+});
+window.addEventListener('appinstalled', () => {
+  pendingInstallPrompt = null;
+  installButton.textContent = 'Aplicación instalada';
+  // No hay notificaciones: solo se confirma que la PWA se instaló.
+  displayInstallHelp('Alerta Litoral ya está instalada en tu dispositivo. Buscá el ícono entre tus aplicaciones.');
+});
+
+async function requestAppInstall() {
+  if (alreadyInstalled()) {
+    displayInstallHelp('Ya estás usando Alerta Litoral como aplicación instalada.');
+    return;
+  }
+  if (androidDevice && pendingInstallPrompt) {
+    const event = pendingInstallPrompt;
+    pendingInstallPrompt = null;
+    try {
+      // El prompt se llama directamente a partir del clic del usuario.
+      await event.prompt();
+      const choice = await event.userChoice;
+      if (choice?.outcome === 'dismissed') {
+        displayInstallHelp('Si cambiás de opinión, podés usar el menú ⋮ de Chrome y tocar «Instalar aplicación».');
+      }
+    } catch (err) {
+      displayInstallHelp('Abrí Alerta Litoral en Google Chrome, tocá el menú ⋮ y elegí «Instalar aplicación» o «Agregar a pantalla principal».');
+    }
+    return;
+  }
+  if (androidDevice) {
+    displayInstallHelp('Abrí este enlace directamente en Google Chrome (no dentro de WhatsApp). Tocá el menú ⋮ y elegí «Instalar aplicación» o «Agregar a pantalla principal». Si el navegador todavía no ofrece instalación directa, podés crear el acceso desde ese menú.');
+  } else if (iosDevice) {
+    displayInstallHelp('En iPhone, abrí el enlace en Safari, tocá Compartir y elegí «Agregar a pantalla de inicio».');
+  } else {
+    displayInstallHelp('Abrí el menú de tu navegador y buscá «Instalar aplicación» o «Crear acceso directo».');
+  }
+}
+installButton.addEventListener('click', requestAppInstall);
+if (installTab) installTab.addEventListener('click', event => {
+  event.preventDefault();
+  requestAppInstall();
+});
+installButton.textContent = alreadyInstalled() ? 'Aplicación instalada' : androidDevice ? 'Instalar aplicación' : 'Cómo instalar';
+
 $('#shareBtn').addEventListener('click',async()=>{const data={title:'Alerta Litoral',text:'Informes del Niño · Paraná y Salado en Santa Fe',url:location.origin};if(navigator.share){try{await navigator.share(data)}catch{}}else{try{await navigator.clipboard.writeText(data.url);$('#shareBtn').title='Enlace copiado'}catch{window.prompt('Copiá el enlace:',data.url)}}});
 const reportDate=report=>{const x=report.reportDate;if(!x)return null;const d=new Date(x+'T12:00:00-03:00');return localDate(d,{hour:undefined,minute:undefined})};
 function makeRiverGroup(wrap,title,subtitle,stations,emptyText,links){
