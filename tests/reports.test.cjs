@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test');const assert=require('node:assert/strict');
-const {SOURCES,num,parseMap,parseFichSalado,parseFichHistory,parseSantoTomeNews,latestRecord,parseDaily,parseEnso,parseObservations,parseBulletin,parseFeed,collect}=require('../lib/reports.cjs');
+const {SOURCES,num,parseMap,parseFichSalado,parseFichHistory,parseSantoTomeNews,latestRecord,parseDaily,parseEnso,parseObservations,parseBulletin,parseFeed,thresholds,collect}=require('../lib/reports.cjs');
 test('Lecturas en metros con coma y punto; no acepta números de miles ni inverosímiles',()=>{
  assert.equal(num('4,23'),4.23);assert.equal(num('2.22'),2.22);assert.equal(num('17700'),null);assert.equal(num('-3'),null);assert.equal(num(''),null)
 });
@@ -38,11 +38,12 @@ test('FICH–UNL: Recreo y Santo Tomé; no confunde el arroyo Cululú',()=>{
  assert.equal(a[0].reportedOn,'2026-10-28');assert.equal(a[0].observedAt,null);
  assert.equal(a[1].station,'Santo Tomé');assert.equal(a[1].trend,'crece');
 });
-test('Si INA falla, incorpora el parte publicado por FICH sin inventar hora',async()=>{
- const d=await collect({fetcher:async(u)=>u===SOURCES.fichSalado?fichHtml:'',now:new Date('2026-10-29T12:00:00Z')});
- assert.equal(d.stations.length,2);assert.equal(d.stations[0].station,'Recreo · Ruta 70');
- assert.equal(d.stations[1].station,'Santo Tomé');assert.equal(d.stations[0].stale,false);
- assert.equal(d.fetched.fichSalado,true);
+test('Consulta alternativa CSV INA conserva fecha original y reemplaza archivo cuando llega una lectura nueva',async()=>{
+ const csv='timestart,valor\n2026-10-27T15:51:00Z,2.22\n2026-10-29T15:51:00Z,2.36';
+ const data=await collect({now:new Date('2026-10-29T21:00:00Z'),fetcher:async url=>url.includes('/103/observaciones')?csv:''});
+ const r=data.stations.find(x=>x.station==='Recreo · Ruta 70');
+ assert.equal(r.value,2.36);assert.equal(r.archivedReference,undefined);assert.equal(r.stale,false);
+ assert.equal(data.saladoStationsFound,1);
 });
 test('Prioriza fuente con fecha de publicación/lectura más nueva',()=>{
  const old={station:'Recreo · Ruta 70',value:2.3,observedAt:'2026-10-26T12:00:00Z'};
@@ -64,11 +65,12 @@ test('Agregación usa mapa INA si FICH no responde',async()=>{
  const r=await collect({now:new Date('2026-10-29T12:00:00Z'),fetcher:async url=>url===SOURCES.inaMap?inaSaladoRows:''});
  assert.equal(r.stations.filter(s=>!s.archivedReference).length,1);assert.equal(r.stations.find(s=>!s.archivedReference).station,'Santo Tomé');
 });
-test('Agregación usa historial de Santo Tomé aun si falla mapa y parte FICH',async()=>{
- const r=await collect({now:new Date('2026-10-29T12:00:00Z'),fetcher:async url=>url===SOURCES.fichSantoTome?hist:''});
- assert.equal(r.stations.filter(s=>!s.archivedReference).length,1);assert.equal(r.stations.find(s=>!s.archivedReference).station,'Santo Tomé');
+test('JSON de INA con estructura anidada recupera Santo Tomé',async()=>{
+ const payload=JSON.stringify({data:{series:[{observaciones:[{timeStart:'2026-10-29T15:52:00Z',value:4.35},{timeStart:'2026-10-28T15:52:00Z',value:4.33}]}]}});
+ const r=await collect({now:new Date('2026-10-29T21:00:00Z'),fetcher:async url=>url.startsWith(SOURCES.inaSanto)?payload:''});
+ const s=r.stations.find(s=>s.station==='Santo Tomé');
+ assert.equal(s.value,4.35);assert.equal(s.archivedReference,undefined);assert.equal(s.stale,false);
 });
-
 test('Municipalidad Santo Tomé SF: solo enlaza noticias oficiales relevantes',()=>{
  const html='<a href="/Otros/noticias_ciudad/5746-el_intendente_weiss_ackerley_declara_la_emergencia_hidrica">El Intendente declara la Emergencia Hídrica</a><a href="https://municipiosantotome.gob.ar/crecida-del-rio-uruguay/">Crecida del río Uruguay</a>';
  const news=parseSantoTomeNews(html);assert.equal(news.length,1);assert.equal(news[0].publishedAt,null);assert.match(news[0].url,/www\.santotome\.gob\.ar/);
@@ -84,7 +86,7 @@ test('La lectura del Paraná del 29 tiene prioridad sobre un parte INA del 28', 
 test('Diagnóstico visible y sin inventar datos cuando falla una fuente',async()=>{
  const r=await collect({fetcher:async url=>url===SOURCES.inaDaily?htmlDaily:'',now:new Date('2026-10-29T15:00:00Z')});
  assert.equal(r.saladoStationsFound,0);assert.equal(r.archivedSaladoShown,true);
- assert.equal(r.sourceChecks.find(s=>s.name==='FICH cuenca Salado').ok,false);
+ assert.equal(r.sourceChecks.find(s=>s.name==='INA CSV Recreo').records,0);
  assert.equal(r.sourceChecks.find(s=>s.name==='INA diario').ok,true);
 });
 
@@ -96,15 +98,30 @@ test('API directa INA serie 3044 permite Santo Tomé en el Salado',async()=>{
 });
 
 
-test('Si una estación se recupera de origen, no sustituirla por el archivo estático',async()=>{
- const html='<table><tr><td>28/10/2026</td><td>12:52</td><td>4,33</td><td>0,03</td><td>Crece</td><td>4,30</td></tr></table>';
- const r=await collect({now:new Date('2026-10-29T12:00:00Z'),fetcher:async url=>url===SOURCES.fichSantoTome?html:''});
- const s=r.stations.find(x=>x.station==='Santo Tomé');
- assert.equal(s.value,4.33); assert.equal(s.archivedReference,undefined);assert.equal(r.saladoStationsFound,1);
+test('La referencia de evacuación de Salado NO se inventa; se informa la alerta provincial fechada',()=>{
+ for(const name of ['Santo Tomé','Recreo · Ruta 70']){
+  const r=thresholds({river:'Salado',station:name,alertThreshold:null});
+  assert.equal(r.alertThreshold,4.7);assert.equal(r.provincialAlertThreshold,5.7);
+  assert.equal(r.evacuationThreshold,null);assert.match(r.evacuationStatus,/Sin cota/);
+  assert.match(r.provincialAlertSource,/santafe.gob.ar/);
+ }
+ const parana=thresholds({river:'Paraná',station:'Santa Fe (Puerto)',value:4.25});
+ assert.equal(parana.alertThreshold,5.3);assert.equal(parana.evacuationThreshold,5.7);
 });
 test('El archivo histórico no se presenta como dato actual aunque se consulte hoy',async()=>{
  const r=await collect({now:new Date('2026-11-15T12:00:00Z'),fetcher:async()=>{throw Error('no hay acceso')} });
  assert.equal(r.stations.filter(x=>x.archivedReference).length,2);
  assert.equal(r.stations.every(x=>x.stale),true);
  assert.ok(r.stations.every(x=>x.observedAt.startsWith('2026-10-28')));
+});
+
+test('Lectura anidada no confunde pronósticos con observaciones',()=>{
+ const payload=JSON.stringify({pronosticos:[{valor:9.99,timestart:'2026-10-30T11:00:00Z'}],observaciones:[{valor:4.35,timestart:'2026-10-29T11:00:00Z'}]});
+ const r=parseObservations(payload,'Salado','Santo Tomé',SOURCES.inaSanto);
+ assert.equal(r.value,4.35);
+});
+test('CSV de INA admite punto y coma y coma decimal',()=>{
+ const csv='timestart;valor\n2026-10-27T11:00:00Z;2,15\n2026-10-28T11:00:00Z;2,22';
+ const r=parseObservations(csv,'Salado','Recreo · Ruta 70',SOURCES.inaRec);
+ assert.equal(r.value,2.22);assert.equal(r.trend,'crece');
 });
