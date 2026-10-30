@@ -105,7 +105,71 @@ function makeRiverGroup(wrap,title,subtitle,stations,emptyText,links){
   }
   if(s.source)addLink(left,'Fuente de esta lectura ↗',s.source,'reading-source');
   right.append(el('b',null,`${fmt(s.value)} m`));if(s.trend)right.append(el('span',null,`Tendencia: ${s.trend}`));
-  item.append(left,right);section.append(item);
+  
+  item.append(left,right);
+  const value=Number(s.value);
+  if(Number.isFinite(value)&&value>=0){
+   const valid=n=>Number.isFinite(Number(n))&&Number(n)>0?Number(n):null;
+   const alert=valid(s.alertThreshold);
+   const evac=valid(s.evacuationThreshold);
+   const provincial=valid(s.provincialAlertThreshold);
+   const max=Math.max(1,value,alert||0,evac||0,provincial||0)*1.10;
+   const pct=n=>(Math.min(100,Math.max(0,100*n/max))).toFixed(2)+'%';
+   const old=!!(s.stale||s.archivedReference);
+   const color=old?'#8b99aa':alert!==null&&value>=alert?(evac!==null&&value>=evac?'#951e35':'#c63741'):alert!==null&&value>=alert*0.9?'#c98b1e':'#1686bd';
+   const box=el('div');
+   box.style.cssText='flex:0 0 100%;width:100%;min-width:0;margin-top:6px;padding-top:12px;border-top:1px solid #e0eaf4';
+   const heading=el('div',null,old?'Escala visual - dato anterior':'Escala visual de la altura');
+   heading.style.cssText='font-size:11px;font-weight:700;color:#536f89;margin-bottom:8px';
+   box.append(heading);
+   const track=el('div');
+   track.style.cssText='position:relative;height:19px;border-radius:10px;overflow:hidden;background:#e4edf6';
+   track.setAttribute('role','meter');
+   track.setAttribute('aria-label','Altura del rio en '+s.station);
+   track.setAttribute('aria-valuemin','0');
+   track.setAttribute('aria-valuemax',max.toFixed(2));
+   track.setAttribute('aria-valuenow',value.toFixed(2));
+   track.setAttribute('aria-valuetext',fmt(value)+' metros');
+   const fill=el('div');
+   fill.style.cssText='width:'+pct(value)+';height:100%;background:'+color+';border-radius:10px;transition:width .4s';
+   track.append(fill);
+   const limits=[
+    [s.alertType==='t\u00e9cnica'?'Alerta t\u00e9cnica':'Alerta',alert,'#ae7619'],
+    ['Evacuaci\u00f3n',evac,'#a12842'],
+    ['Referencia provincial (04/09/2026)',provincial,'#6557a5']
+   ];
+   for(const [name,height,tint] of limits){
+    if(height===null)continue;
+    const marker=el('span');
+    marker.style.cssText='position:absolute;left:'+pct(height)+';top:0;bottom:0;width:3px;border-left:1px solid white;background:'+tint;
+    marker.setAttribute('title',name+': '+fmt(height)+' m');
+    track.append(marker);
+   }
+   box.append(track);
+   const axis=el('div');
+   axis.style.cssText='display:flex;justify-content:space-between;font-size:10px;color:#617b93;margin-top:4px';
+   axis.append(el('span',null,'0 m'),el('span',null,fmt(max)+' m (escala visual)'));
+   box.append(axis);
+   const legend=el('div');
+   legend.style.cssText='display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:9px;font-size:11px;line-height:1.4';
+   const now=el('span',null,'Lectura: '+fmt(value)+' m');
+   now.style.cssText='font-weight:750;color:'+color;
+   legend.append(now);
+   for(const [name,height,tint] of limits){
+    if(height===null)continue;
+    const label=el('span',null,name+': '+fmt(height)+' m');
+    label.style.cssText='font-weight:650;color:'+tint;
+    legend.append(label);
+   }
+   box.append(legend);
+   const note=el('div',null,old?'Referencia historica: no indica la situacion actual.':'La altura no representa la profundidad en viviendas ni una orden de evacuacion.');
+   note.style.cssText='font-size:10px;line-height:1.45;color:#697c91;margin-top:8px';
+   box.append(note);
+   item.style.flexWrap='wrap';
+   item.append(box);
+  }
+  section.append(item);
+
  }
  const linkBox=el('div','river-links');for(const [label,url] of links)addLink(linkBox,label,url,'source-link');section.append(linkBox);wrap.append(section);
 }
