@@ -1,3 +1,4 @@
+
 'use strict';
 const {collect,parseFichSalado,thresholds,clean}=require('../lib/reports.cjs');
 const {createHash}=require('node:crypto');
@@ -68,15 +69,12 @@ function addWarnings(reporte,html,ahora){
  if(!reporte.sources.some(x=>x.url===AVISOS))reporte.sources.unshift({name:'FICH-UNL - advertencias hidrol\u00f3gicas',url:AVISOS});
  return true;
 }
-// FICH homepage provides a river height without a measurement date.
 function parseFichParana(html){
  const t=clean(html);
  const m=t.match(/R[i\u00ed]o\s+Paran[a\u00e1]\s*[:|]?\s*(\d{1,2}[,.]\d{1,2})\s*m/i);
  const v=m?Number(m[1].replace(',','.')):NaN;
  return Number.isFinite(v)&&v>=0&&v<=12?v:null;
 }
-// A third-party relay reports a dated PNA observation: NOT an INA bulletin.
-// Restrict parsing to the 'last measurement' section, never predictions.
 function parseDatedPnaRelay(html){
  const t=clean(html).split(/Estimaciones\s+propias/i)[0];
  const m=t.match(/Altura\s*:\s*(\d{1,2}[,.]\d{1,2})\s*m\s*,?\s*medida\s+el\s+(\d{1,2})\s+(ene(?:ro)?|feb(?:rero)?|mar(?:zo)?|abr(?:il)?|may(?:o)?|jun(?:io)?|jul(?:io)?|ago(?:sto)?|sep(?:tiembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?)\s+(20\d{2})\s*[\u00b7,.\s]*?(\d{1,2})\s*:\s*(\d{2})/i);
@@ -106,6 +104,16 @@ function mergeParana(reporte,homeHtml,relayHtml,now){
  const updated={...relay,previous:old?.value??null,
   trend:delta===null?null:delta>0.005?'crece':delta < -0.005?'baja':'estable',
   ageHours:hours,stale:false,archivedReference:false};
+ // Conservar los umbrales del INA si la medicion de PNA es mas reciente.
+ if(old && typeof old.alertThreshold==='number' &&
+    Number.isFinite(old.alertThreshold) && old.alertThreshold>0){
+  updated.alertThreshold=old.alertThreshold;
+  updated.thresholdSource=old.thresholdSource || 'https://alerta.ina.gob.ar/a5/diario/reporte_diario';
+ }
+ if(old && typeof old.evacuationThreshold==='number' &&
+    Number.isFinite(old.evacuationThreshold) && old.evacuationThreshold>0){
+  updated.evacuationThreshold=old.evacuationThreshold;
+ }
  if(i<0)reporte.stations.unshift(updated);else reporte.stations[i]=updated;
  reporte.noteworthy ||= [];
  reporte.noteworthy.unshift({type:'tracking',source:PNA_RELAY,
@@ -141,7 +149,7 @@ async function buildReport({base=collect,read=leer,now=new Date()}={}){
  const result=(fh!==null&&rd)?mergeParana(r,results[3].value,results[4].value,now):{found:0,inserted:0,reason:'Faltan ambas fuentes legibles'};
  r.sourceChecks.push({name:'Parana contraste FICH / PNA',ok:result.found===1,records:result.inserted,
   detail:result.reason});
- 
+
  const parana = (r.stations || []).find(
   s => s.river === 'Paran\u00e1' &&
        s.station === 'Santa Fe (Puerto)'
@@ -156,7 +164,6 @@ async function buildReport({base=collect,read=leer,now=new Date()}={}){
  return r;
 }
 module.exports=async function handler(req,res){
-
  if(req.method!=='GET')return res.status(405).json({message:'Metodo no permitido'});
  try{
   const r=await buildReport();
