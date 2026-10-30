@@ -141,9 +141,22 @@ async function buildReport({base=collect,read=leer,now=new Date()}={}){
  const result=(fh!==null&&rd)?mergeParana(r,results[3].value,results[4].value,now):{found:0,inserted:0,reason:'Faltan ambas fuentes legibles'};
  r.sourceChecks.push({name:'Parana contraste FICH / PNA',ok:result.found===1,records:result.inserted,
   detail:result.reason});
+ 
+ const parana = (r.stations || []).find(
+  s => s.river === 'Paran\u00e1' &&
+       s.station === 'Santa Fe (Puerto)'
+ );
+
+ if (parana && parana.source &&
+     parana.source.includes('/getObservaciones')) {
+  parana.source =
+   'https://alerta.ina.gob.ar/a5/secciones?seriesId=30';
+ }
+
  return r;
 }
 module.exports=async function handler(req,res){
+
  if(req.method!=='GET')return res.status(405).json({message:'Metodo no permitido'});
  try{
   const r=await buildReport();
