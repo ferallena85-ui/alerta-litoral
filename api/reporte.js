@@ -1,6 +1,6 @@
 
 'use strict';
-const {collect,parseFichSalado,parseFichHistory,SOURCES,thresholds,clean}=require('../lib/reports.cjs');
+const {collect,parseFichSalado,parseFichParana,parseFichHistory,SOURCES,thresholds,clean}=require('../lib/reports.cjs');
 const {createHash}=require('node:crypto');
 const {PNA,select,valid}=require('../lib/hydrometry.cjs');
 const {getPna,createPnaClient,errorInfo}=require('../lib/prefectura.cjs');
@@ -72,7 +72,7 @@ function addWarnings(reporte,html,ahora){
 }
 async function buildReport({base=collect,read=leer,now=new Date(),pnaClient=null}={}){
  const pnaTask=Promise.resolve().then(()=>pnaClient?pnaClient.get():read===leer?getPna():createPnaClient({now:()=>now.getTime(),request:async url=>({html:await read(url),httpStatus:200,finalUrl:url})}).get());
- const results=await Promise.allSettled([base({now}),read(ALTURAS),read(AVISOS),pnaTask,read(SOURCES.fichSantoTome),read(SOURCES.fichRecreo)]);
+ const results=await Promise.allSettled([base({now}),read(ALTURAS),read(AVISOS),pnaTask,read(SOURCES.fichSantoTome),read(SOURCES.fichRecreo),read(SOURCES.fichParana)]);
  const r=results[0].status==='fulfilled'?results[0].value:{version:1,status:'unavailable',stations:[],news:[],sources:[],noteworthy:[],fetched:{}};
  r.checkedAt=now.toISOString();r.version=1;r.sourceChecks ||= [];r.sources ||= [];r.fetched ||= {};
  const candidates=(r.stations||[]).flatMap(s=>[s,...(s.alternatives||[])]);
@@ -87,11 +87,23 @@ async function buildReport({base=collect,read=leer,now=new Date(),pnaClient=null
  };
  diagnostico('FICH-UNL Salado oficial',1,html=>mergeSalado(r,html,now));
  diagnostico('FICH-UNL parte hidrologico',2,html=>addWarnings(r,html,now));
+ const fichParanaResponse=results[6];
+ let fichParana=null;
+ let fichParanaDetail='No disponible';
+ if(fichParanaResponse.status==='fulfilled'){
+  try{
+   const parsed=parseFichParana(fichParanaResponse.value);
+   if(valid(parsed,now)){fichParana=parsed;fichParanaDetail='Parte diario con fecha válida; hora individual de observación no publicada';}
+   else fichParanaDetail='Respuesta recibida sin parte vigente interpretable para Santa Fe / Paraná';
+  }catch(e){fichParanaDetail='Error de interpretación: '+String(e.message||e).slice(0,120);}
+ }else fichParanaDetail='Error de consulta: '+String(fichParanaResponse.reason?.message||'Sin conexión').slice(0,120);
+ r.sourceChecks.push({name:'FICH-UNL · Paraná (datos Prefectura)',ok:!!fichParana,records:fichParana?1:0,detail:fichParanaDetail});
+ if(fichParana){r.sources.push({name:'FICH-UNL · parte del Paraná con datos de Prefectura',url:SOURCES.fichParana});r.fetched.fichParana=true;}
  const pnaResult=results[3].status==='fulfilled'?results[3].value:{reading:null,diagnostic:{ok:false,...errorInfo(results[3].reason),detail:String(results[3].reason?.message||'Sin conexión')}};
  const pna=pnaResult.reading;
  r.sourceChecks.push({name:'Prefectura Naval Argentina · Santa Fe',...pnaResult.diagnostic,records:pna?1:0});
  r.pnaConsultation=pnaResult.diagnostic;
- candidates.push(...(r.stations||[]));if(pna)candidates.push(pna);
+ candidates.push(...(r.stations||[]));if(pna)candidates.push(pna);if(fichParana)candidates.push(thresholds(fichParana));
  for(const [index,station,url] of [[4,'Santo Tomé',SOURCES.fichSantoTome],[5,'Recreo · Ruta 70',SOURCES.fichRecreo]]){
   const response=results[index];const record=response.status==='fulfilled'?parseFichHistory(response.value,station,url):null;
   const ok=valid(record,now);
@@ -123,7 +135,7 @@ module.exports=async function handler(req,res){
  try{
   const r=await buildReport();
   res.setHeader('Content-Type','application/json; charset=utf-8');
-  res.setHeader('Cache-Control','public, max-age=0, s-maxage=900, stale-while-revalidate=60');
+  res.setHeader('Cache-Control','public, max-age=0, s-maxage=60, stale-while-revalidate=30');
   return res.status(200).json(r);
  }catch(e){res.setHeader('Cache-Control','no-store');return res.status(503).json({version:1,status:'unavailable'});}
 };

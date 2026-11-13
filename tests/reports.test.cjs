@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test');const assert=require('node:assert/strict');
-const {SOURCES,num,parseMap,parseFichSalado,parseFichHistory,parseSantoTomeNews,latestRecord,parseDaily,parseEnso,parseObservations,parseBulletin,parseFeed,thresholds,collect}=require('../lib/reports.cjs');
+const {SOURCES,num,parseMap,parseFichSalado,parseFichParana,parseFichHistory,parseSantoTomeNews,latestRecord,parseDaily,parseEnso,parseObservations,parseBulletin,parseFeed,thresholds,collect}=require('../lib/reports.cjs');
 test('Lecturas en metros con coma y punto; no acepta números de miles ni inverosímiles',()=>{
  assert.equal(num('4,23'),4.23);assert.equal(num('2.22'),2.22);assert.equal(num('17700'),null);assert.equal(num('-3'),null);assert.equal(num(''),null)
 });
@@ -124,4 +124,27 @@ test('CSV de INA admite punto y coma y coma decimal',()=>{
  const csv='timestart;valor\n2026-10-27T11:00:00Z;2,15\n2026-10-28T11:00:00Z;2,22';
  const r=parseObservations(csv,'Salado','Recreo · Ruta 70',SOURCES.inaRec);
  assert.equal(r.value,2.22);assert.equal(r.trend,'crece');
+});
+
+const fichParanaHoy=`<h3>Viernes, 13 de noviembre de 2026</h3><table>
+<tr><th>Puerto</th><th>Río</th><th>Altura</th><th>Variación</th><th>Cambio</th><th>Alt. Ant.</th><th>Alerta</th><th>Evacuación</th></tr>
+<tr><td>Paraná</td><td>Paraná</td><td>5,57</td><td>0,09</td><td>Crece</td><td>5,48</td><td>4,70</td><td>5,00</td></tr>
+<tr><td>Santa Fe</td><td>Paraná</td><td>5,50</td><td>0,11</td><td>Crece</td><td>5,39</td><td>5,30</td><td>5,70</td></tr>
+<tr><td>San Javier (Santa Fe)</td><td>San Javier</td><td>7,98</td><td>0,01</td><td>Crece</td><td>7,97</td><td>6,00</td><td>6,50</td></tr>
+</table>`;
+test('FICH Paraná: lectura Santa Fe 5,50, no ciudad Paraná ni San Javier',()=>{
+ const p=parseFichParana(fichParanaHoy);
+ assert.equal(p.value,5.50);assert.equal(p.previous,5.39);
+ assert.equal(p.reportedOn,'2026-11-13');assert.equal(p.observedAt,null);
+ assert.equal(p.alertThreshold,5.3);assert.equal(p.evacuationThreshold,5.7);
+ assert.equal(p.trend,'crece');
+});
+test('FICH Paraná: no inventar fecha si falta encabezado del parte',()=>{
+ assert.equal(parseFichParana('<table><tr><td>Santa Fe</td><td>Paraná</td><td>5,50</td><td>0,11</td><td>Crece</td><td>5,39</td><td>5,30</td><td>5,70</td></tr></table>'),null);
+});
+test('Un dato INA con hora verificada del mismo día prevalece sobre parte diario sin hora',()=>{
+ const part=parseFichParana(fichParanaHoy);
+ const point={river:'Paraná',station:'Santa Fe (Puerto)',value:5.52,observedAt:'2026-11-13T10:00:00Z'};
+ assert.equal(latestRecord(part,point).value,5.52);
+ assert.equal(latestRecord(point,part).value,5.52);
 });
