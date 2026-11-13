@@ -30,3 +30,15 @@ test('La variación de Prefectura se presenta en su período real, sin atribuirl
  const {context}=setup();const label=vm.runInContext('hydroVariation({value:5.48,previous:5.47,variationCm:1,observedAt:"2026-11-13T01:00:00Z",previousObservedAt:"2026-11-12T23:00:00Z"})',context);
  assert.equal(label,'+1 cm en 2 h');assert.doesNotMatch(label,/24/);
 });
+test('El primer resumen muestra una barra por medición y no inventa evacuación del Salado',async()=>{
+ const {window,context,payload,calls}=setup();const date=new Date().toISOString();
+ payload.stations.push({river:'Salado',station:'Santo Tomé',value:5.41,observedAt:date,source:'https://cim.fich.unl.edu.ar/rios/6/historico',alertThreshold:4.7,alertType:'técnica',evacuationThreshold:null},{river:'Salado',station:'Recreo · Ruta 70',value:2.47,observedAt:date,source:'https://cim.fich.unl.edu.ar/rios/5/historico',alertThreshold:4.7,alertType:'técnica',evacuationThreshold:null});
+ await vm.runInContext('loadReport()',context);const cards=window.document.querySelectorAll('#riverSummary article');
+ assert.equal(window.document.querySelectorAll('#riverSummary [role="meter"]').length,3);assert.equal(cards[0].querySelector('[role="meter"]').getAttribute('aria-valuenow'),'5.48');assert.match(cards[0].querySelector('.hydro-gauge').textContent,/Alerta: 5,30 m/);assert.match(cards[0].querySelector('.hydro-gauge').textContent,/Evacuación: 5,70 m/);
+ assert.match(cards[1].querySelector('.hydro-gauge').textContent,/Alerta técnica: 4,70 m/);assert.match(cards[1].querySelector('.hydro-gauge').textContent,/Evacuación: sin cota oficial publicada/);assert.equal(cards[1].querySelector('.hydro-gauge-marker.evacuation'),null);assert.equal(cards[2].querySelector('.hydro-gauge').dataset.tone,'normal');assert.equal(calls(),1);
+});
+test('La barra cambia de color al acercarse, superar alerta y alcanzar evacuación; datos antiguos quedan grises',()=>{
+ const {context}=setup();
+ const tones=vm.runInContext('[2,4.9,5.3,5.7].map(value=>hydroGauge({station:"Santa Fe (Puerto)",value,alertThreshold:5.3,evacuationThreshold:5.7}).dataset.tone)',context);
+ assert.deepEqual(Array.from(tones),['normal','near','alert','evacuation']);assert.equal(vm.runInContext('hydroGauge({station:"Santa Fe (Puerto)",value:5.7,alertThreshold:5.3,evacuationThreshold:5.7,stale:true}).dataset.tone',context),'old');assert.equal(vm.runInContext('hydroGauge(null).querySelector("[role=meter]")',context),null);
+});

@@ -29,12 +29,42 @@ function hydroWave(){
  for(const y of [10,23]){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',`M5 ${y+5} Q14 ${y-3} 24 ${y+3} T43 ${y+3}`);path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','6');path.setAttribute('stroke-linecap','round');svg.append(path)}
  return svg;
 }
+function hydroGauge(s,{includeProvincial=false}={}){
+ const box=el('div','hydro-gauge');
+ if(!s||typeof s.value!=='number'||!Number.isFinite(s.value)){
+  box.append(el('p','hydro-gauge-note','Sin medición verificable: no se muestra una altura estimada.'));return box;
+ }
+ const positive=n=>typeof n==='number'&&Number.isFinite(n)&&n>0?n:null;
+ const value=s.value,alert=positive(s.alertThreshold),evac=positive(s.evacuationThreshold),provincial=includeProvincial?positive(s.provincialAlertThreshold):null;
+ const min=Math.min(0,Math.floor(value)),max=Math.max(1,value,alert||0,evac||0,provincial||0)*1.1;
+ const percent=n=>Math.min(100,Math.max(0,100*(n-min)/(max-min))).toFixed(2)+'%';
+ const old=!!(s.stale||s.archivedReference||s.retained);
+ const tone=old?'old':evac!==null&&value>=evac?'evacuation':alert!==null&&value>=alert?'alert':alert!==null&&value>=alert*.9?'near':'normal';
+ box.dataset.tone=tone;
+ const heading=el('div','hydro-gauge-heading');heading.append(el('span',null,old?'Escala visual · lectura conservada':'Altura y niveles de referencia'),el('strong',null,fmt(value)+' m'));
+ const track=el('div','hydro-gauge-track');track.setAttribute('role','meter');track.setAttribute('aria-label','Altura del río en '+s.station);track.setAttribute('aria-valuemin',String(min));track.setAttribute('aria-valuemax',max.toFixed(2));track.setAttribute('aria-valuenow',String(value));
+ const alertLabel=s.alertType==='técnica'?'Alerta técnica':'Alerta';
+ track.setAttribute('aria-valuetext',fmt(value)+' metros'+(alert!==null?'; '+alertLabel+' '+fmt(alert)+' metros':'')+(evac!==null?'; evacuación '+fmt(evac)+' metros':'; evacuación sin cota oficial publicada')+(old?'; lectura conservada':''));
+ const fill=el('div','hydro-gauge-fill');fill.style.width=percent(value);track.append(fill);
+ const limits=[[alertLabel,alert,'alert'],['Evacuación',evac,'evacuation'],...(provincial!==null?[['Referencia provincial (04/09/2026)',provincial,'provincial']]:[])];
+ for(const [label,height,kind] of limits){
+  if(height===null)continue;
+  const mark=el('span','hydro-gauge-marker '+kind);mark.style.left=percent(height);mark.title=label+': '+fmt(height)+' m';mark.setAttribute('aria-hidden','true');track.append(mark);
+ }
+ const legend=el('div','hydro-gauge-legend');
+ for(const [label,height,kind] of limits)legend.append(el('span','hydro-gauge-limit '+kind,label+': '+(height===null?'sin cota oficial publicada':fmt(height)+' m')));
+ box.append(heading,track,legend);
+ if(tone==='near')box.append(el('p','hydro-gauge-note','Amarillo: cercanía visual al umbral, no una alerta oficial.'));
+ if(old)box.append(el('p','hydro-gauge-note','La barra conserva la fecha de esta lectura; no representa una medición nueva.'));
+ return box;
+}
 function hydroReading(s,river,location,compact=false){
  const [state,label]=hydroState(s),article=el('article','hydro-reading '+state+(compact?' compact':''));
  const name=el('div','hydro-name'),identity=el('div','hydro-identity');identity.append(el('strong',null,'Río '+river),el('span',null,'⌖ '+location));name.append(hydroWave(),identity);
  const value=el('div','hydro-value');if(!compact)value.append(el('small',null,'Altura observada'));value.append(el('b',null,s?fmt(s.value)+' m':'—'));
  const trend=el('div','hydro-trend');trend.append(el('strong',null,s?hydroTrend(s):'Sin información'),el('small',null,s?hydroVariation(s):'No se inventan lecturas'));
  article.append(name,value,trend,el('span','hydro-badge',label));
+ if(compact)article.append(hydroGauge(s));
  if(s){
   const meta=el('div','hydro-meta');meta.append(el('span',null,hydroTime(s)));addLink(meta,hydroSource(s)+' ↗',s.source,'reading-source');
   if(s.ageHours!=null)meta.append(el('span',null,'Antigüedad: '+Math.floor(s.ageHours)+' h'+(s.archivedReference?' · referencia histórica':'')));
