@@ -1,9 +1,9 @@
-
 'use strict';
 const {collect,parseFichSalado,parseFichParana,parseFichHistory,SOURCES,thresholds,clean}=require('../lib/reports.cjs');
 const {createHash}=require('node:crypto');
 const {PNA,select,valid}=require('../lib/hydrometry.cjs');
 const {getPna,createPnaClient,errorInfo}=require('../lib/prefectura.cjs');
+const {getRioAlert,URL:RIO_ALERT_URL}=require('../lib/rioalert.cjs');
 const lastValid=new Map();
 const ALTURAS='https://cim.fich.unl.edu.ar/rios/salado/alturas';
 const AVISOS='https://cim.fich.unl.edu.ar/advertencias';
@@ -23,7 +23,7 @@ function fecha(s){
 }
 function mergeSalado(reporte,html,ahora){
  const datos=parseFichSalado(html).filter(x=>x.river==='Salado'&&
-  ['Santo Tom\u00e9','Recreo \u00b7 Ruta 70'].includes(x.station)&&
+  ['Santo Tomé','Recreo · Ruta 70'].includes(x.station)&&
   x.reportedOn&&fecha(x)<=ahora.getTime()+21600000);
  reporte.stations ||= [];
  let inserted=0;
@@ -41,7 +41,7 @@ function mergeSalado(reporte,html,ahora){
   }
  }
  reporte.saladoStationsFound=reporte.stations.filter(x=>x.river==='Salado'&&
-  ['Santo Tom\u00e9','Recreo \u00b7 Ruta 70'].includes(x.station)&&!x.archivedReference).length;
+  ['Santo Tomé','Recreo · Ruta 70'].includes(x.station)&&!x.archivedReference).length;
  reporte.archivedSaladoShown=reporte.stations.some(x=>x.archivedReference);
  reporte.latestSaladoDate=reporte.stations.filter(x=>x.river==='Salado')
   .map(x=>x.observedAt||x.reportedOn).filter(Boolean).sort().at(-1)||null;
@@ -55,24 +55,27 @@ function mergeSalado(reporte,html,ahora){
 }
 function addWarnings(reporte,html,ahora){
  const texto=clean(html);
- const f=texto.match(/(?:lunes|martes|mi[e\u00e9]rcoles|jueves|viernes|s[a\u00e1]bado|domingo)\s*,?\s*(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(20\d{2})/i);
+ const f=texto.match(/(?:lunes|martes|miércoles|jueves|viernes|sábado|domingo)\s*,?\s*(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(20\d{2})/i);
  const mes=f?MESES.indexOf(f[2].toLowerCase()):-1;
  if(mes<0)return false;
  const fechaTexto=f[3]+'-'+String(mes+1).padStart(2,'0')+'-'+f[1].padStart(2,'0');
  const edad=ahora.getTime()-Date.parse(fechaTexto+'T00:00:00-03:00');
  if(edad< -21600000||edad>72*3600000)return false;
- const m=texto.match(/R[i\u00ed]o Salado y sus afluentes en el territorio santafesino\s+(.+?)(?:\s+Direcci[o\u00f3]n\b|\s+Tel[e\u00e9]fono\b|$)/i);
+ const m=texto.match(/Río Salado y sus afluentes en el territorio santafesino\s+(.+?)(?:\s+Dirección\b|\s+Teléfono\b|$)/i);
  if(!m||m[1].length<30)return false;
  reporte.noteworthy ||= [];
  reporte.noteworthy.unshift({type:'official',source:AVISOS,
-  title:'Parte hidrol\u00f3gico FICH-UNL ('+f[1].padStart(2,'0')+'/'+String(mes+1).padStart(2,'0')+'): '+m[1].slice(0,280)});
+  title:'Parte hidrológico FICH-UNL ('+f[1].padStart(2,'0')+'/'+String(mes+1).padStart(2,'0')+'): '+m[1].slice(0,280)});
  reporte.sources ||= [];
- if(!reporte.sources.some(x=>x.url===AVISOS))reporte.sources.unshift({name:'FICH-UNL - advertencias hidrol\u00f3gicas',url:AVISOS});
+ if(!reporte.sources.some(x=>x.url===AVISOS))reporte.sources.unshift({name:'FICH-UNL - advertencias hidrológicas',url:AVISOS});
  return true;
 }
-async function buildReport({base=collect,read=leer,now=new Date(),pnaClient=null}={}){
+async function buildReport({base=collect,read=leer,now=new Date(),pnaClient=null,rioClient=null}={}){
  const pnaTask=Promise.resolve().then(()=>pnaClient?pnaClient.get():read===leer?getPna():createPnaClient({now:()=>now.getTime(),request:async url=>({html:await read(url),httpStatus:200,finalUrl:url})}).get());
- const results=await Promise.allSettled([base({now}),read(ALTURAS),read(AVISOS),pnaTask,read(SOURCES.fichSantoTome),read(SOURCES.fichRecreo),read(SOURCES.fichParana)]);
+ // El lector secundario no se ejecuta si la prueba inyecta una fuente ficticia,
+ // salvo que la prueba proporcione explicitamente rioClient.
+ const rioTask=Promise.resolve().then(()=>rioClient?rioClient.get():read===leer?getRioAlert():{reading:null,diagnostic:{ok:false,detail:'No consultado en prueba'}});
+ const results=await Promise.allSettled([base({now}),read(ALTURAS),read(AVISOS),pnaTask,read(SOURCES.fichSantoTome),read(SOURCES.fichRecreo),read(SOURCES.fichParana),rioTask]);
  const r=results[0].status==='fulfilled'?results[0].value:{version:1,status:'unavailable',stations:[],news:[],sources:[],noteworthy:[],fetched:{}};
  r.checkedAt=now.toISOString();r.version=1;r.sourceChecks ||= [];r.sources ||= [];r.fetched ||= {};
  const candidates=(r.stations||[]).flatMap(s=>[s,...(s.alternatives||[])]);
@@ -103,7 +106,12 @@ async function buildReport({base=collect,read=leer,now=new Date(),pnaClient=null
  const pna=pnaResult.reading;
  r.sourceChecks.push({name:'Prefectura Naval Argentina · Santa Fe',...pnaResult.diagnostic,records:pna?1:0});
  r.pnaConsultation=pnaResult.diagnostic;
- candidates.push(...(r.stations||[]));if(pna)candidates.push(pna);if(fichParana)candidates.push(thresholds(fichParana));
+ const rioResult=results[7].status==='fulfilled'?results[7].value:{reading:null,diagnostic:{ok:false,detail:String(results[7].reason?.message||'Sin conexión')}};
+ const rio=rioResult.reading&&valid(rioResult.reading,now)?rioResult.reading:null;
+ r.sourceChecks.push({name:'RíoAlert · republicación no oficial de Prefectura',...rioResult.diagnostic,records:rio?1:0});
+ r.rioAlertConsultation=rioResult.diagnostic;
+ candidates.push(...(r.stations||[]));if(pna)candidates.push(pna);if(fichParana)candidates.push(thresholds(fichParana));if(rio)candidates.push(thresholds(rio));
+ if(rio){r.sources.push({name:'RíoAlert · fuente secundaria, atribuye su altura a Prefectura',url:RIO_ALERT_URL});r.fetched.rioAlert=!!rioResult.diagnostic.ok;}
  for(const [index,station,url] of [[4,'Santo Tomé',SOURCES.fichSantoTome],[5,'Recreo · Ruta 70',SOURCES.fichRecreo]]){
   const response=results[index];const record=response.status==='fulfilled'?parseFichHistory(response.value,station,url):null;
   const ok=valid(record,now);
@@ -127,7 +135,6 @@ async function buildReport({base=collect,read=leer,now=new Date(),pnaClient=null
  if(pna){r.sources.push({name:'Prefectura Naval Argentina · registro público de alturas',url:PNA});r.fetched.pna=!!pnaResult.diagnostic.ok;}
  if(selected.length)r.status='partial_or_available';
  r.reportId=createHash('sha256').update(JSON.stringify(r.stations)).digest('hex').slice(0,12);
-
  return r;
 }
 module.exports=async function handler(req,res){
