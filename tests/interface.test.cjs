@@ -26,3 +26,7 @@ test('Falla de actualización mantiene altura, fuente y fecha, con advertencia',
  const {window,context,offline}=setup();await vm.runInContext('loadReport()',context);offline();await vm.runInContext('loadReport()',context);
  const d=window.document;assert.match(d.querySelector('#riverSummary').textContent,/5,48 m/);assert.match(d.querySelector('#riverSummary').textContent,/conservada/);assert.match(d.querySelector('#statusBadge').textContent,/Sin conexión/);assert.match(d.querySelector('#checkedAt').textContent,/última consulta exitosa/);assert.equal(d.querySelector('#refreshBtn').disabled,false);
 });
+test('La variación de Prefectura se presenta en su período real, sin atribuirla a 24 horas',()=>{
+ const {context}=setup();const label=vm.runInContext('hydroVariation({value:5.48,previous:5.47,variationCm:1,observedAt:"2026-11-13T01:00:00Z",previousObservedAt:"2026-11-12T23:00:00Z"})',context);
+ assert.equal(label,'+1 cm en 2 h');assert.doesNotMatch(label,/24/);
+});

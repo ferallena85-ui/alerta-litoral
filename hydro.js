@@ -24,10 +24,15 @@ function hydroVariation(s){
  if(s.previousObservedAt&&s.observedAt){const hours=(Date.parse(s.observedAt)-Date.parse(s.previousObservedAt))/3600000;if(hours>0)interval='en '+Number(hours.toFixed(1)).toLocaleString('es-AR')+' h';}
  return (cm>0?'+':'')+cm+' cm '+interval;
 }
+function hydroWave(){
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 48 40');svg.setAttribute('aria-hidden','true');svg.setAttribute('class','hydro-wave');
+ for(const y of [10,23]){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',`M5 ${y+5} Q14 ${y-3} 24 ${y+3} T43 ${y+3}`);path.setAttribute('fill','none');path.setAttribute('stroke','currentColor');path.setAttribute('stroke-width','6');path.setAttribute('stroke-linecap','round');svg.append(path)}
+ return svg;
+}
 function hydroReading(s,river,location,compact=false){
  const [state,label]=hydroState(s),article=el('article','hydro-reading '+state+(compact?' compact':''));
- const name=el('div','hydro-name');name.append(el('strong',null,'Río '+river),el('span',null,location));
- const value=el('div','hydro-value',s?fmt(s.value)+' m':'—');
+ const name=el('div','hydro-name'),identity=el('div','hydro-identity');identity.append(el('strong',null,'Río '+river),el('span',null,'⌖ '+location));name.append(hydroWave(),identity);
+ const value=el('div','hydro-value');if(!compact)value.append(el('small',null,'Altura observada'));value.append(el('b',null,s?fmt(s.value)+' m':'—'));
  const trend=el('div','hydro-trend');trend.append(el('strong',null,s?hydroTrend(s):'Sin información'),el('small',null,s?hydroVariation(s):'No se inventan lecturas'));
  article.append(name,value,trend,el('span','hydro-badge',label));
  if(s){
@@ -41,6 +46,7 @@ function hydroReading(s,river,location,compact=false){
     const ref=el('div','hydro-alternative',(other.archivedReference?'Referencia histórica · ':'')+hydroSource(other)+': '+fmt(other.value)+' m · '+hydroTime(other));addLink(ref,'Ver registro ↗',other.source);article.append(ref);
    }
    if(s.review?.length)article.append(el('p','hydro-review','Diferencia entre fuentes para horarios próximos (≥20 cm): revisar los registros antes de interpretar el nivel. Se conservan los valores de ambas fuentes.'));
+   for(const warning of s.qualityWarnings||[])article.append(el('p','hydro-review',warning));
   }
  }
  return article;
@@ -65,6 +71,7 @@ function hydroHistory(stations){
 }
 function renderHydrometry(data){
  const stations=data.stations||[],summary=$('#riverSummary'),current=$('#hydroCurrent');summary.replaceChildren();current.replaceChildren();
+ const updateLabel=$('#riverSummaryUpdated');if(updateLabel)updateLabel.textContent=data.checkedAt?'Consulta de la aplicación: '+localDate(data.checkedAt)+' h':'Consulta de fuentes pendiente';
  for(const [river,key,location] of hydroKeys){const s=stations.find(x=>x.river===river&&x.station===key);summary.append(hydroReading(s,river,location,true));current.append(hydroReading(s,river,location));}
  hydroHistory(stations);
  const forecast=$('#panel-forecast');forecast.replaceChildren();forecast.append(el('h3',null,'Pronóstico del INA · Paraná en Santa Fe'));
@@ -76,7 +83,14 @@ function renderHydrometry(data){
  forecast.append(el('p','section-note','Las líneas observadas y pronosticadas del gráfico son distintas. Los valores previstos nunca se usan como altura actual. No se calcula una diferencia numérica sin una proyección fechada y verificable.'));
  const sources=$('#panel-sources');sources.replaceChildren();sources.append(el('p',null,'Consulta de la aplicación: '+localDate(data.checkedAt)+'. Cada tarjeta conserva la fecha de observación o del parte. Una nueva consulta puede devolver la misma medición.'));
  sources.append(el('p','section-note','Se prioriza la observación válida más reciente de la misma estación. Un parte sin hora no se presenta como una observación con hora confirmada. Datos mayores de 72 h se señalan como antiguos. Las diferencias de 20 cm o más entre fuentes separadas por hasta una hora se marcan para revisión; ese criterio no es un umbral hidrométrico oficial.'));
- for(const check of data.sourceChecks||[])sources.append(el('p','source-check',(check.ok?'✓ ':'⚠ ')+check.name+' · '+check.detail));
+ for(const check of data.sourceChecks||[]){
+  const detail=el('p','source-check',(check.ok?'✓ ':'⚠ ')+check.name+' · '+check.detail);
+  if(check.sourceCheckedAt)detail.append(el('span','source-check-time','Consulta de esta fuente: '+localDate(check.sourceCheckedAt)+' h'+(check.cacheHit?' · resultado guardado':'')));
+  if(check.category==='timeout'||check.category==='connect_timeout')detail.append(el('span','source-check-time','El servidor no pudo completar la conexión a tiempo. Esto no significa que la página oficial esté caída.'));
+  if(check.httpStatus)detail.append(el('span','source-check-time','Respuesta de la fuente: HTTP '+check.httpStatus));
+  if(check.nextSourceCheckAt)detail.append(el('span','source-check-time','Próxima consulta habilitada desde: '+localDate(check.nextSourceCheckAt)+' h'));
+  sources.append(detail);
+ }
  for(const source of data.sources||[])addLink(sources,source.name+' ↗',source.url);
 }
 document.querySelectorAll('.hydro-tabs [role="tab"]').forEach((button,index,tabs)=>{

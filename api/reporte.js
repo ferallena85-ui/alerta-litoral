@@ -2,7 +2,8 @@
 'use strict';
 const {collect,parseFichSalado,parseFichHistory,SOURCES,thresholds,clean}=require('../lib/reports.cjs');
 const {createHash}=require('node:crypto');
-const {PNA,parsePna,select,valid}=require('../lib/hydrometry.cjs');
+const {PNA,select,valid}=require('../lib/hydrometry.cjs');
+const {getPna,createPnaClient,errorInfo}=require('../lib/prefectura.cjs');
 const lastValid=new Map();
 const ALTURAS='https://cim.fich.unl.edu.ar/rios/salado/alturas';
 const AVISOS='https://cim.fich.unl.edu.ar/advertencias';
@@ -69,8 +70,9 @@ function addWarnings(reporte,html,ahora){
  if(!reporte.sources.some(x=>x.url===AVISOS))reporte.sources.unshift({name:'FICH-UNL - advertencias hidrol\u00f3gicas',url:AVISOS});
  return true;
 }
-async function buildReport({base=collect,read=leer,now=new Date()}={}){
- const results=await Promise.allSettled([base({now}),read(ALTURAS),read(AVISOS),read(PNA),read(SOURCES.fichSantoTome),read(SOURCES.fichRecreo)]);
+async function buildReport({base=collect,read=leer,now=new Date(),pnaClient=null}={}){
+ const pnaTask=Promise.resolve().then(()=>pnaClient?pnaClient.get():read===leer?getPna():createPnaClient({now:()=>now.getTime(),request:async url=>({html:await read(url),httpStatus:200,finalUrl:url})}).get());
+ const results=await Promise.allSettled([base({now}),read(ALTURAS),read(AVISOS),pnaTask,read(SOURCES.fichSantoTome),read(SOURCES.fichRecreo)]);
  const r=results[0].status==='fulfilled'?results[0].value:{version:1,status:'unavailable',stations:[],news:[],sources:[],noteworthy:[],fetched:{}};
  r.checkedAt=now.toISOString();r.version=1;r.sourceChecks ||= [];r.sources ||= [];r.fetched ||= {};
  const candidates=(r.stations||[]).flatMap(s=>[s,...(s.alternatives||[])]);
@@ -85,9 +87,10 @@ async function buildReport({base=collect,read=leer,now=new Date()}={}){
  };
  diagnostico('FICH-UNL Salado oficial',1,html=>mergeSalado(r,html,now));
  diagnostico('FICH-UNL parte hidrologico',2,html=>addWarnings(r,html,now));
- const pna=results[3].status==='fulfilled'?parsePna(results[3].value,now):null;
- r.sourceChecks.push({name:'Prefectura Naval Argentina · Santa Fe',ok:!!pna,records:pna?1:0,
- detail:pna?'Observación fechada de la escala Santa Fe / Paraná':results[3].status==='rejected'?String(results[3].reason?.message||'Sin conexión'):'Sin observación válida'});
+ const pnaResult=results[3].status==='fulfilled'?results[3].value:{reading:null,diagnostic:{ok:false,...errorInfo(results[3].reason),detail:String(results[3].reason?.message||'Sin conexión')}};
+ const pna=pnaResult.reading;
+ r.sourceChecks.push({name:'Prefectura Naval Argentina · Santa Fe',...pnaResult.diagnostic,records:pna?1:0});
+ r.pnaConsultation=pnaResult.diagnostic;
  candidates.push(...(r.stations||[]));if(pna)candidates.push(pna);
  for(const [index,station,url] of [[4,'Santo Tomé',SOURCES.fichSantoTome],[5,'Recreo · Ruta 70',SOURCES.fichRecreo]]){
   const response=results[index];const record=response.status==='fulfilled'?parseFichHistory(response.value,station,url):null;
@@ -109,7 +112,7 @@ async function buildReport({base=collect,read=leer,now=new Date()}={}){
  }).filter(Boolean);
  r.stations=[...selected,...(r.stations||[]).filter(s=>!keys.includes(s.river+'|'+s.station))];
  r.archivedSaladoShown=r.stations.some(s=>s.archivedReference);
- if(pna){r.sources.push({name:'Prefectura Naval Argentina · registro público de alturas',url:PNA});r.fetched.pna=true;}
+ if(pna){r.sources.push({name:'Prefectura Naval Argentina · registro público de alturas',url:PNA});r.fetched.pna=!!pnaResult.diagnostic.ok;}
  if(selected.length)r.status='partial_or_available';
  r.reportId=createHash('sha256').update(JSON.stringify(r.stations)).digest('hex').slice(0,12);
 
