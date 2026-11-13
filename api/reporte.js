@@ -1,11 +1,11 @@
 
 'use strict';
-const {collect,parseFichSalado,thresholds,clean}=require('../lib/reports.cjs');
+const {collect,parseFichSalado,parseFichHistory,SOURCES,thresholds,clean}=require('../lib/reports.cjs');
 const {createHash}=require('node:crypto');
+const {PNA,parsePna,select,valid}=require('../lib/hydrometry.cjs');
+const lastValid=new Map();
 const ALTURAS='https://cim.fich.unl.edu.ar/rios/salado/alturas';
 const AVISOS='https://cim.fich.unl.edu.ar/advertencias';
-const FICH_PARANA='https://cim.fich.unl.edu.ar/';
-const PNA_RELAY='https://rioalert.com.ar/puertos/santa-fe';
 const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 async function leer(url){
@@ -69,66 +69,11 @@ function addWarnings(reporte,html,ahora){
  if(!reporte.sources.some(x=>x.url===AVISOS))reporte.sources.unshift({name:'FICH-UNL - advertencias hidrol\u00f3gicas',url:AVISOS});
  return true;
 }
-function parseFichParana(html){
- const t=clean(html);
- const m=t.match(/R[i\u00ed]o\s+Paran[a\u00e1]\s*[:|]?\s*(\d{1,2}[,.]\d{1,2})\s*m/i);
- const v=m?Number(m[1].replace(',','.')):NaN;
- return Number.isFinite(v)&&v>=0&&v<=12?v:null;
-}
-function parseDatedPnaRelay(html){
- const t=clean(html).split(/Estimaciones\s+propias/i)[0];
- const m=t.match(/Altura\s*:\s*(\d{1,2}[,.]\d{1,2})\s*m\s*,?\s*medida\s+el\s+(\d{1,2})\s+(ene(?:ro)?|feb(?:rero)?|mar(?:zo)?|abr(?:il)?|may(?:o)?|jun(?:io)?|jul(?:io)?|ago(?:sto)?|sep(?:tiembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?)\s+(20\d{2})\s*[\u00b7,.\s]*?(\d{1,2})\s*:\s*(\d{2})/i);
- if(!m)return null;
- const month={'ene':1,'feb':2,'mar':3,'abr':4,'may':5,'jun':6,'jul':7,'ago':8,'sep':9,'oct':10,'nov':11,'dic':12}[m[3].slice(0,3).toLowerCase()];
- const value=Number(m[1].replace(',','.'));
- if(!month||!Number.isFinite(value)||value<0||value>12)return null;
- const date=m[4]+'-'+String(month).padStart(2,'0')+'-'+m[2].padStart(2,'0');
- const stamp=date+'T'+m[5].padStart(2,'0')+':'+m[6]+':00-03:00';
- const parsed=Date.parse(stamp);
- if(!Number.isFinite(parsed)||new Date(parsed-10800000).toISOString().slice(0,10)!==date)return null;
- return {river:'Paran\u00e1',station:'Santa Fe (Puerto)',value,observedAt:new Date(parsed).toISOString(),
-  source:PNA_RELAY,measurementOrigin:'Prefectura Naval Argentina (retransmitido por R\u00edoAlert, sin validaci\u00f3n INA)',
-  verificationSource:FICH_PARANA,alertThreshold:5.3,evacuationThreshold:5.7,alertType:'oficial'};
-}
-function mergeParana(reporte,homeHtml,relayHtml,now){
- const fich=parseFichParana(homeHtml),relay=parseDatedPnaRelay(relayHtml);
- if(fich===null||!relay)return {found:0,inserted:0,reason:'Falta dato de FICH o medicion PNA fechada'};
- if(Math.abs(fich-relay.value)>0.011)return {found:0,inserted:0,reason:'Discrepancia entre FICH y la medicion retransmitida'};
- const hours=(now.getTime()-fecha(relay))/3600000;
- if(hours < -1||hours > 72)return {found:0,inserted:0,reason:'La medicion retransmitida no es reciente'};
- reporte.stations ||= [];
- const i=reporte.stations.findIndex(s=>s.river==='Paran\u00e1'&&s.station==='Santa Fe (Puerto)');
- const old=i===-1?null:reporte.stations[i];
- if(old&&fecha(old)>=fecha(relay))return {found:1,inserted:0,reason:'INA ya ofrece una medicion igual o mas nueva'};
- const delta=old&&Number.isFinite(old.value)?relay.value-old.value:null;
- const updated={...relay,previous:old?.value??null,
-  trend:delta===null?null:delta>0.005?'crece':delta < -0.005?'baja':'estable',
-  ageHours:hours,stale:false,archivedReference:false};
- // Conservar los umbrales del INA si la medicion de PNA es mas reciente.
- if(old && typeof old.alertThreshold==='number' &&
-    Number.isFinite(old.alertThreshold) && old.alertThreshold>0){
-  updated.alertThreshold=old.alertThreshold;
-  updated.thresholdSource=old.thresholdSource || 'https://alerta.ina.gob.ar/a5/diario/reporte_diario';
- }
- if(old && typeof old.evacuationThreshold==='number' &&
-    Number.isFinite(old.evacuationThreshold) && old.evacuationThreshold>0){
-  updated.evacuationThreshold=old.evacuationThreshold;
- }
- if(i<0)reporte.stations.unshift(updated);else reporte.stations[i]=updated;
- reporte.noteworthy ||= [];
- reporte.noteworthy.unshift({type:'tracking',source:PNA_RELAY,
-  title:'Paran\u00e1 en Santa Fe: '+relay.value.toFixed(2).replace('.',',')+' m, medici\u00f3n del '+relay.observedAt.slice(0,10)+' (Prefectura retransmitida por R\u00edoAlert; altura contrastada con FICH-UNL). El parte diario INA puede tener otra fecha.'});
- reporte.sources ||= [];
- if(!reporte.sources.some(s=>s.url===PNA_RELAY))reporte.sources.unshift({name:'R\u00edoAlert: lectura PNA retransmitida (sin validar)',url:PNA_RELAY});
- if(!reporte.sources.some(s=>s.url===FICH_PARANA))reporte.sources.unshift({name:'FICH-UNL: altura del Paran\u00e1 (sin fecha en portada)',url:FICH_PARANA});
- reporte.fetched ||= {};reporte.fetched.paranaContrastado=true;
- reporte.reportId=createHash('sha256').update(JSON.stringify(reporte.stations.map(x=>[x.station,x.value,x.observedAt,x.reportedOn]))).digest('hex').slice(0,12);
- return {found:1,inserted:1,reason:'Medicion de PNA fechada y valor coincidente FICH'};
-}
 async function buildReport({base=collect,read=leer,now=new Date()}={}){
- const results=await Promise.allSettled([base(),read(ALTURAS),read(AVISOS),read(FICH_PARANA),read(PNA_RELAY)]);
+ const results=await Promise.allSettled([base({now}),read(ALTURAS),read(AVISOS),read(PNA),read(SOURCES.fichSantoTome),read(SOURCES.fichRecreo)]);
  const r=results[0].status==='fulfilled'?results[0].value:{version:1,status:'unavailable',stations:[],news:[],sources:[],noteworthy:[],fetched:{}};
- r.checkedAt=now.toISOString();r.version=1;r.sourceChecks ||= [];
+ r.checkedAt=now.toISOString();r.version=1;r.sourceChecks ||= [];r.sources ||= [];r.fetched ||= {};
+ const candidates=(r.stations||[]).flatMap(s=>[s,...(s.alternatives||[])]);
  const diagnostico=(name,k,fn)=>{
   const x=results[k],d={name,ok:false,detail:'',records:0};
   if(x.status==='fulfilled'){
@@ -140,26 +85,33 @@ async function buildReport({base=collect,read=leer,now=new Date()}={}){
  };
  diagnostico('FICH-UNL Salado oficial',1,html=>mergeSalado(r,html,now));
  diagnostico('FICH-UNL parte hidrologico',2,html=>addWarnings(r,html,now));
- const fh=results[3].status==='fulfilled'?parseFichParana(results[3].value):null;
- const rd=results[4].status==='fulfilled'?parseDatedPnaRelay(results[4].value):null;
- r.sourceChecks.push({name:'FICH portada Parana',ok:fh!==null,records:fh!==null?1:0,
-  detail:results[3].status==='fulfilled'?(fh===null?'Sin altura interpretable':'Altura sin fecha: '+fh+' m'):String(results[3].reason?.message||'Sin conexion').slice(0,100)});
- r.sourceChecks.push({name:'PNA retransmitido (RioAlert)',ok:!!rd,records:rd?1:0,
-  detail:results[4].status==='fulfilled'?(rd?'Medicion fechada encontrada':'No se detecto medicion fechada'):String(results[4].reason?.message||'Sin conexion').slice(0,100)});
- const result=(fh!==null&&rd)?mergeParana(r,results[3].value,results[4].value,now):{found:0,inserted:0,reason:'Faltan ambas fuentes legibles'};
- r.sourceChecks.push({name:'Parana contraste FICH / PNA',ok:result.found===1,records:result.inserted,
-  detail:result.reason});
-
- const parana = (r.stations || []).find(
-  s => s.river === 'Paran\u00e1' &&
-       s.station === 'Santa Fe (Puerto)'
- );
-
- if (parana && parana.source &&
-     parana.source.includes('/getObservaciones')) {
-  parana.source =
-   'https://alerta.ina.gob.ar/a5/secciones?seriesId=30';
+ const pna=results[3].status==='fulfilled'?parsePna(results[3].value,now):null;
+ r.sourceChecks.push({name:'Prefectura Naval Argentina · Santa Fe',ok:!!pna,records:pna?1:0,
+ detail:pna?'Observación fechada de la escala Santa Fe / Paraná':results[3].status==='rejected'?String(results[3].reason?.message||'Sin conexión'):'Sin observación válida'});
+ candidates.push(...(r.stations||[]));if(pna)candidates.push(pna);
+ for(const [index,station,url] of [[4,'Santo Tomé',SOURCES.fichSantoTome],[5,'Recreo · Ruta 70',SOURCES.fichRecreo]]){
+  const response=results[index];const record=response.status==='fulfilled'?parseFichHistory(response.value,station,url):null;
+  const ok=valid(record,now);
+  r.sourceChecks.push({name:'FICH histórico · '+station,ok,records:ok?1:0,detail:ok?'Estación y observación con fecha y hora verificadas':response.status==='rejected'?String(response.reason?.message||'Sin conexión'):'Sin lectura fechada válida'});
+  if(ok){candidates.push(thresholds(record));r.sources.push({name:'FICH-UNL · histórico '+station,url});}
  }
+ for(const s of lastValid.values())candidates.push(...[s,...(s.alternatives||[])].map(record=>({...record,retained:true})));
+ const keys=['Paraná|Santa Fe (Puerto)','Salado|Santo Tomé','Salado|Recreo · Ruta 70'];
+ const selected=keys.map(key=>{
+  const records=candidates.filter(s=>s.river+'|'+s.station===key&&valid(s,now)).map(thresholds);
+  const unique=[...new Map(records.map(s=>[[s.source,s.value,s.observedAt,s.reportedOn].join('|'),s])).values()];
+  const choice=select(unique,now);
+  if(choice){
+   choice.retained=!candidates.some(s=>!s.retained&&s.source===choice.source&&s.value===choice.value&&s.observedAt===choice.observedAt&&s.reportedOn===choice.reportedOn);
+   lastValid.set(key,choice);
+  }
+  return choice;
+ }).filter(Boolean);
+ r.stations=[...selected,...(r.stations||[]).filter(s=>!keys.includes(s.river+'|'+s.station))];
+ r.archivedSaladoShown=r.stations.some(s=>s.archivedReference);
+ if(pna){r.sources.push({name:'Prefectura Naval Argentina · registro público de alturas',url:PNA});r.fetched.pna=true;}
+ if(selected.length)r.status='partial_or_available';
+ r.reportId=createHash('sha256').update(JSON.stringify(r.stations)).digest('hex').slice(0,12);
 
  return r;
 }
@@ -175,6 +127,3 @@ module.exports=async function handler(req,res){
 module.exports.buildReport=buildReport;
 module.exports.mergeSalado=mergeSalado;
 module.exports.addWarnings=addWarnings;
-module.exports.parseFichParana=parseFichParana;
-module.exports.parseDatedPnaRelay=parseDatedPnaRelay;
-module.exports.mergeParana=mergeParana;

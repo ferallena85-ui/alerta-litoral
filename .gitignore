@@ -1,0 +1,6 @@
+node_modules/
+.local-research/
+.edit-*.cjs
+
+.vercel
+.env*

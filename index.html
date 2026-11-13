@@ -6,7 +6,7 @@
  <meta property="og:title" content="Alerta Litoral | Informes del Niño"><meta property="og:description" content="Paraná, Salado y novedades oficiales en un solo lugar.">
  <link rel="icon" type="image/png" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png"><link rel="manifest" href="/manifest.webmanifest">
  <title>Alerta Litoral · Informes del Niño</title><link rel="stylesheet" href="/styles.css">
- <script src="/app.js" defer></script>
+ <script src="/app.js" defer></script><script src="/hydro.js" defer></script>
 </head>
 <body>
  <div class="app-shell">
@@ -27,11 +27,10 @@ Alerta Litoral no pertenece ni representa a organismos gubernamentales nacionale
 <p>Reporte unificado del Paraná, Salado y novedades relevantes.</p><button class="primary-btn" data-scroll="reporte">Ver informe <span aria-hidden="true">›</span></button></div>
     <svg class="hero-art" viewBox="0 0 560 250" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="riverg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a5def3"/><stop offset="1" stop-color="#1675ad"/></linearGradient></defs><path d="M0 178 Q65 150 126 181T251 178T371 176T560 165V250H0Z" fill="url(#riverg)" opacity=".85"/><path d="M0 204q72-20 145 5t135-5t130 1t150-4" fill="none" stroke="#e5faff" stroke-width="4" opacity=".6"/><path d="M75 178 H560" stroke="#376b8c" stroke-width="7"/><path d="M293 65V183M428 70V183" stroke="#326986" stroke-width="7"/><path d="m293 68-67 107m67-107-39 107m39-107 42 107m-42-107 75 107m60-104-68 104m68-104-40 104m40-104 40 104m-40-104 66 104" stroke="#7baac1" stroke-width="2"/><path d="M0 181l60-34 36 30 33-22 48 27" fill="#6e9aa1" opacity=".6"/></svg>
    </section>
-   
-<section aria-label="Emergencias oficiales" style="margin:16px 0;padding:16px;border:1px solid #d9e4f0;border-radius:16px;background:#fff;">
-  <h2 style="font-size:17px;margin:0 0 8px;color:#123e71;">
-    Emergencias y alertas oficiales
-  </h2>
+
+<section class="river-summary" aria-labelledby="riverSummaryTitle"><h2 id="riverSummaryTitle">≋ Resumen de ríos – Últimas mediciones</h2><p class="small-meta">Cada organismo publica en sus propios horarios. Consultar las fuentes no implica una medición nueva.</p><div id="riverSummary" aria-live="polite"><p class="skeleton">Consultando las tres estaciones…</p></div></section>
+<details class="emergency-panel"><summary>⚠ Emergencias y alertas oficiales</summary><div class="emergency-content">
+
   <p style="font-size:13px;line-height:1.5;margin:0 0 12px;color:#526477;">
     Alerta Litoral es independiente y no oficial. Ante una emergencia, consultá las indicaciones de las autoridades competentes.
   </p>
@@ -49,15 +48,15 @@ Alerta Litoral no pertenece ni representa a organismos gubernamentales nacionale
     Emergencias en Santa Fe capital:
     <a href="tel:103" style="font-weight:800;">COBEM 103</a>
   </p>
-</section>
+</div></details>
 <div class="status-strip" role="status"><span class="status-clock" aria-hidden="true">◷</span><div><span class="muted-label">Última consulta de fuentes</span><strong id="checkedAt">Consultando…</strong></div><span id="statusBadge" class="status-pill">Cargando</span></div>
    <div id="reloadError" class="fetch-error hidden" role="alert">No se pudo actualizar el reporte ahora. <button id="retryBtn" type="button">Reintentar</button></div>
    <div class="section-head"><div><span class="eyebrow">INFORMACIÓN CENTRALIZADA</span><h2>Situación en Santa Fe</h2></div><button class="text-action" type="button" id="refreshBtn" title="Consultar última versión disponible">Actualizar ↻</button></div>
    <div class="main-cards">
-    <section class="expand-card" id="hidrica"><button class="card-toggle" aria-expanded="false" aria-controls="hidricaDetail"><span class="circle-icon river-icon" aria-hidden="true">≋</span><span class="card-copy"><strong>Situación hídrica en Santa Fe</strong><small>Paraná, Salado, Recreo y Santo Tomé: alturas y tendencias.</small></span><span class="chevron" aria-hidden="true">›</span></button><div class="detail" id="hidricaDetail" hidden><p class="section-note">Paraná en Santa Fe y Salado en Recreo / Santo Tomé. Cada lectura conserva su fecha y fuente oficial.</p><div id="rivers" class="river-list"><p class="skeleton">Consultando estaciones del INA…</p></div><a class="source-link" href="https://alerta.ina.gob.ar/" target="_blank" rel="noopener noreferrer">Consultar mapa oficial del INA ↗</a></div><div class="wave-bottom"></div></section>
+    <section class="expand-card" id="hidrica"><button class="card-toggle" aria-expanded="true" aria-controls="hidricaDetail"><span class="circle-icon river-icon" aria-hidden="true">≋</span><span class="card-copy"><strong>Situación hídrica en Santa Fe</strong><small>Paraná, Salado, Recreo y Santo Tomé: alturas y tendencias.</small></span><span class="chevron" aria-hidden="true">›</span></button><div class="detail" id="hidricaDetail"><p class="section-note">Paraná en Santa Fe y Salado en Recreo / Santo Tomé. Cada lectura conserva su fecha y fuente oficial.</p><div class="hydro-tabs" role="tablist" aria-label="Información hídrica"><button role="tab" id="tab-current" aria-controls="panel-current" aria-selected="true" tabindex="0">Estado actual</button><button role="tab" id="tab-history" aria-controls="panel-history" aria-selected="false" tabindex="-1">Evolución (gráficos)</button><button role="tab" id="tab-forecast" aria-controls="panel-forecast" aria-selected="false" tabindex="-1">Pronóstico INA</button><button role="tab" id="tab-sources" aria-controls="panel-sources" aria-selected="false" tabindex="-1">Fuentes y actualizaciones</button></div><div role="tabpanel" id="panel-current" aria-labelledby="tab-current"><div id="hydroCurrent"></div><details class="other-readings"><summary>Detalle de umbrales y otras estaciones</summary><div id="rivers" class="river-list"><p class="skeleton">Consultando estaciones del INA…</p></div></details></div><div role="tabpanel" id="panel-history" aria-labelledby="tab-history" hidden></div><div role="tabpanel" id="panel-forecast" aria-labelledby="tab-forecast" hidden></div><div role="tabpanel" id="panel-sources" aria-labelledby="tab-sources" hidden></div><a class="source-link" href="https://alerta.ina.gob.ar/" target="_blank" rel="noopener noreferrer">Consultar mapa oficial del INA ↗</a></div><div class="wave-bottom"></div></section>
     <section class="expand-card" id="nino"><button class="card-toggle" aria-expanded="false" aria-controls="ninoDetail"><span class="circle-icon cloud-icon" aria-hidden="true">☁</span><span class="card-copy"><strong>Fenómeno de El Niño</strong><small>Condiciones actuales y perspectivas de lluvias.</small></span><span class="chevron" aria-hidden="true">›</span></button><div class="detail" id="ninoDetail" hidden><div class="data-label">Informe climático</div><h3 id="ensoStatus">Consultando información oficial…</h3><p id="ensoText" class="body-text"></p><p class="small-meta" id="ensoDate"></p><a class="source-link" id="ensoSource" href="https://ws2.smn.gob.ar/enos" target="_blank" rel="noopener noreferrer">Ver informe del SMN ↗</a><p class="section-note">El Niño es una condición climática de escala estacional, no una predicción de inundaciones en un barrio particular.</p></div></section>
     <section class="expand-card" id="novedades"><button class="card-toggle" aria-expanded="false" aria-controls="novedadesDetail"><span class="circle-icon news-icon" aria-hidden="true">▤</span><span class="card-copy"><strong>Centro de novedades</strong><small>Publicaciones verificables y cambios recientes.</small></span><span class="chevron" aria-hidden="true">›</span></button><div class="detail" id="novedadesDetail" hidden><h3>Novedades recientes</h3><p class="section-note">Prensa local y partes oficiales, con fecha y enlace a cada publicación.</p><div id="recentNews" class="news-recent" aria-live="polite"><p class="section-note">Consultando novedades recientes…</p></div><p class="small-meta">Otros comunicados y antecedentes:</p><div id="news"><p class="skeleton">Buscando novedades oficiales…</p></div><div class="municipal-links"><a class="source-link" href="https://santafeciudad.gov.ar/direccion-de-gestion-de-riesgo/monitoreo/" target="_blank" rel="noopener noreferrer">Santa Fe · Monitoreo municipal ↗</a><a class="source-link" href="https://www.santotome.gob.ar/Otros/noticias_ciudad" target="_blank" rel="noopener noreferrer">Santo Tomé · Noticias municipales ↗</a></div><p class="section-note">Las comunicaciones de Santo Tomé se consultan desde el sitio municipal; no se presentan como avisos recientes sin fecha verificable.</p></div></section>
-    <section class="expand-card" id="reporte"><button class="card-toggle" aria-expanded="true" aria-controls="reporteDetail"><span class="circle-icon report-icon" aria-hidden="true">▥</span><span class="card-copy"><strong>Último reporte</strong><small>Consulta automática cada 5 minutos mientras la app esté abierta; las alturas pueden tener hasta 15 minutos de caché.</small></span><span class="chevron" aria-hidden="true">›</span></button><div class="detail" id="reporteDetail"><p id="reportSummary" class="body-text">Estamos preparando el resumen con las últimas fuentes disponibles.</p><div id="recentHeadline" class="notice-list"></div><div id="highlights" class="notice-list"></div><div class="forecast" id="forecastWrap" hidden><span class="data-label">Perspectiva del INA</span><p id="forecastText"></p><a id="forecastLink" href="https://alerta.ina.gob.ar/a5/diario/reporte_diario" class="source-link" target="_blank" rel="noopener noreferrer">Abrir reporte INA ↗</a></div><div class="source-panel"><strong>Fuentes oficiales del Paraná, Salado y municipios</strong><ul id="sources"></ul></div><p class="small-meta">La revisión de fuentes no implica que los organismos hayan emitido nuevos datos. Este sitio es informativo y no reemplaza las instrucciones de Defensa Civil.</p></div></section>
+    <section class="expand-card" id="reporte"><button class="card-toggle" aria-expanded="false" aria-controls="reporteDetail"><span class="circle-icon report-icon" aria-hidden="true">▥</span><span class="card-copy"><strong>Último reporte</strong><small>Consulta automática cada 5 minutos mientras la app esté abierta; las alturas pueden tener hasta 15 minutos de caché.</small></span><span class="chevron" aria-hidden="true">›</span></button><div class="detail" id="reporteDetail" hidden><p id="reportSummary" class="body-text">Estamos preparando el resumen con las últimas fuentes disponibles.</p><div id="recentHeadline" class="notice-list"></div><div id="highlights" class="notice-list"></div><div class="forecast" id="forecastWrap" hidden><span class="data-label">Perspectiva del INA</span><p id="forecastText"></p><a id="forecastLink" href="https://alerta.ina.gob.ar/a5/diario/reporte_diario" class="source-link" target="_blank" rel="noopener noreferrer">Abrir reporte INA ↗</a></div><div class="source-panel"><strong>Fuentes oficiales del Paraná, Salado y municipios</strong><ul id="sources"></ul></div><p class="small-meta">La revisión de fuentes no implica que los organismos hayan emitido nuevos datos. Este sitio es informativo y no reemplaza las instrucciones de Defensa Civil.</p></div></section>
    </div>
    <section id="instalar" class="install-panel"><div><span class="eyebrow">EN TU CELULAR</span><h2>Instalá Alerta Litoral</h2><p>No necesita registro, no solicita ubicación y no envía notificaciones.</p></div><button id="installBtn" class="secondary-btn" type="button">Instalar aplicación</button><div id="installInfo" class="install-info" hidden><p><strong>iPhone:</strong> abrí el enlace en Safari, tocá Compartir y elegí “Agregar a pantalla de inicio”.</p><p><strong>Android:</strong> tocá Instalar, confirmá el aviso de Chrome y se creará el acceso. Si no aparece el aviso, abrí la web en Chrome y usá el menú ⋮ → “Instalar aplicación” o “Agregar a pantalla principal”.</p></div></section>
   </main>
@@ -70,7 +69,7 @@ Alerta Litoral no pertenece ni representa a organismos gubernamentales nacionale
 (function(){
  const FIVE_MIN=5*60*1000;
  const allowDomains=new Set(['www.airedesantafe.com.ar','airedesantafe.com.ar','www.unosantafe.com.ar','unosantafe.com.ar','cim.fich.unl.edu.ar']);
- let lastMainUpdate=Date.now();
+
  let inFlight=false;
  function dateLabel(n){
   if(n.publishedOn && /^\d{4}-\d{2}-\d{2}$/.test(n.publishedOn)){
@@ -122,15 +121,11 @@ Alerta Litoral no pertenece ni representa a organismos gubernamentales nacionale
  }
  function refreshIfDue(){
   if(document.visibilityState!=='visible')return;
-  const now=Date.now();
-  if(now-lastMainUpdate>=FIVE_MIN){
-   const b=document.getElementById('refreshBtn');
-   if(b && !b.disabled){b.click();lastMainUpdate=now}
-  }
+  loadReport();
   updateNews();
  }
  window.addEventListener('load',function(){updateNews();setInterval(refreshIfDue,FIVE_MIN);
-  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')refreshIfDue()});
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&Date.now()-lastCheck>=FIVE_MIN)refreshIfDue()});
  });
 })();
 </script>

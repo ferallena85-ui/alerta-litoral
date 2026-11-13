@@ -3,10 +3,11 @@ const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const root=__dirname,port=process.env.PORT||3000;
 const mime={'.html':'text/html','.css':'text/css','.js':'text/javascript','.json':'application/json','.webmanifest':'application/manifest+json','.svg':'image/svg+xml','.png':'image/png'};
 http.createServer(async(req,res)=>{
- if(req.url?.startsWith('/api/reporte')){
+ if(req.url?.startsWith('/api/reporte')||req.url?.startsWith('/api/novedades')){
   res.status=(code)=>{res.statusCode=code;return {json:(body)=>res.end(JSON.stringify(body))}};
   res.json=(body)=>res.end(JSON.stringify(body));
-  return require('./api/reporte.js')(req,res);
+  res.setHeader('Content-Type','application/json; charset=utf-8');
+  return require(req.url.startsWith('/api/novedades')?'./api/novedades.js':'./api/reporte.js')(req,res);
  }
  const filename=path.resolve(root,'.'+decodeURIComponent((req.url||'/').split('?')[0]==='/'?'/index.html':req.url.split('?')[0]));
  if(!filename.startsWith(root+path.sep)||!fs.existsSync(filename)||!fs.statSync(filename).isFile()){res.statusCode=404;return res.end('404')}

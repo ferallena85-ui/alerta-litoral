@@ -1,0 +1,10 @@
+.local-research/
+node_modules/
+.git/
+.vercel/
+.env*
+tests/
+*.md
+*.zip
+local-server.js
+.edit-*.cjs
