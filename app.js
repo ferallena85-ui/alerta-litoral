@@ -5,7 +5,23 @@ const localDate=(date,settings={})=>{if(!date)return 'Fecha no disponible';const
 const fmt=n=>Number(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const el=(tag,cl,text)=>{let item=document.createElement(tag);if(cl)item.className=cl;if(text!==undefined)item.textContent=text;return item};
 const safeLink=(u)=>{try{const x=new URL(u);return x.protocol==='https:'&&(/(^|\.)argentina\.gob\.ar$|(^|\.)ina\.gob\.ar$|^contenidosweb\.prefecturanaval\.gob\.ar$|^cim\.fich\.unl\.edu\.ar$|(^|\.)smn\.gob\.ar$|(^|\.)santafeciudad\.gov\.ar$|(^|\.)santafenoticias\.gob\.ar$|^fich\.unl\.edu\.ar$|(^|\.)santotome\.gob\.ar$|(^|\.)argentina\.gob\.ar$|(^|\.)santafe\.gob\.ar$|(^|\.)santafenoticias\.gob\.ar$/).test(x.hostname)?x.href:null}catch{return null}};
-function addLink(container,label,url,className='source-link'){const href=safeLink(url);if(!href)return;const a=el('a',className,label);a.href=href;a.target='_blank';a.rel='noopener noreferrer';container.append(a)}
+function addLink(container, label, url, className = 'source-link') {  let target = url;try {
+    const u = new URL(url);
+    if (
+      u.hostname === 'alerta.ina.gob.ar' &&
+      u.pathname === '/a5/getObservaciones'
+    ) {
+      target = 'https://alerta.ina.gob.ar/a5/secciones';
+    }
+  } catch {}
+  const href = safeLink(target);
+  if (!href) return;
+  const a = el('a', className, label);
+  a.href = href;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  container.append(a);
+}
 function openCard(button){const open=button.getAttribute('aria-expanded')==='true';button.setAttribute('aria-expanded',String(!open));const panel=document.getElementById(button.getAttribute('aria-controls'));if(panel)panel.hidden=open}
 document.querySelectorAll('.card-toggle').forEach(button=>button.addEventListener('click',()=>openCard(button)));
 document.querySelectorAll('[data-scroll]').forEach(button=>button.addEventListener('click',()=>{const target=document.getElementById(button.dataset.scroll);target?.scrollIntoView({behavior:'smooth',block:'start'});const b=target?.querySelector('.card-toggle');if(b?.getAttribute('aria-expanded')==='false')openCard(b)}));
